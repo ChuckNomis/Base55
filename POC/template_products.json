@@ -5,6 +5,7 @@
     {
       "name": "search_products",
       "description": "Search for products by a keyword",
+      "tool_prompt": "Generate ONLY the tool implementation code (POC mode: no FastMCP server wiring).\n\nPick the correct product endpoint(s) from the OpenAPI spec. Ignore endpoints that belong to orders, users, auth, or any other non-product domains.\n\nOutput format requirements (strict):\n- Return ONLY Python code (no prose, no markdown fences, no extra text).\n- Do NOT include `mcp = ...` and do NOT include `@mcp.tool()`.\n- Output ONLY the tool function itself (plus any imports it needs).\n- The function name MUST be `search_products`.\n- Function parameters MUST mirror the input schema fields directly. For this tool use: `async def search_products(query: str) -> dict:`.\n- Include a docstring on the function that describes what it does and its input/output.\n- Use robust HTTP handling: reasonable timeout, raise on non-2xx, and handle JSON parsing safely.\n- Prefer `httpx` and `async def` unless the spec clearly prevents it.\n- Do NOT wrap the tool in a class.",
       "input_schema": {
         "type": "object",
         "properties": {

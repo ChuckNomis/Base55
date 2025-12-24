@@ -1,7 +1,17 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
+
+try:
+    # Load environment variables from .env if available (optional dependency)
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:
+    # If python-dotenv is not installed, continue without raising
+    pass
 
 from openai import OpenAI
 
@@ -18,11 +28,59 @@ def truncate_json_for_prompt(data: dict, max_chars: int) -> str:
     return text[:max_chars] + "... [truncated]"
 
 
+def extract_code_only(content: str) -> str:
+    # Strip markdown fences if present and return only code content.
+    if "```" not in content:
+        return content.strip()
+    segments = content.split("```")
+    for seg in segments:
+        cleaned = seg.lstrip()
+        if cleaned.startswith("python"):
+            cleaned = cleaned[len("python") :].lstrip("\n\r\t ")
+        if cleaned.strip():
+            return cleaned.strip()
+    return content.strip()
+
+
+def validate_tool_function_only(code: str, tool_name: str) -> list[str]:
+    missing: list[str] = []
+    if f"def {tool_name}" not in code and f"async def {tool_name}" not in code:
+        missing.append(f"function definition for {tool_name}")
+    # Prefer explicit parameters over `input: dict`.
+    if re.search(rf"(async\s+)?def\s+{re.escape(tool_name)}\s*\(\s*input\s*:\s*dict", code):
+        missing.append("explicit function parameters (do not use input: dict)")
+    if "@mcp.tool" in code.replace(" ", ""):
+        missing.append("remove @mcp.tool (POC requires function-only output)")
+    if "FastMCP" in code or "mcp = " in code:
+        missing.append("remove FastMCP/mcp server wiring (POC requires function-only output)")
+    # rough check for docstring: triple quotes somewhere after def line
+    if f"def {tool_name}" in code or f"async def {tool_name}" in code:
+        # Heuristic: require any triple-quote in file
+        if '"""' not in code and "'''" not in code:
+            missing.append("function docstring")
+    return missing
+
+
+def call_model(client: OpenAI, model: str, system_prompt: str, user_prompt: str) -> str:
+    resp = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    return extract_code_only(resp.choices[0].message.content)
+
+
 def build_user_prompt(tool: dict, spec_text: str) -> str:
+    tool_prompt = tool.get("tool_prompt") or tool.get("prompt") or (
+        "Select the best matching endpoint(s) from the OpenAPI spec for this tool. "
+        "Ignore unrelated or dummy endpoints. Ensure the response matches the output schema."
+    )
     return (
         "You will generate a FastMCP-compatible Python tool that calls the best matching "
-        "endpoint(s) from the OpenAPI spec for the tool below. Ignore unrelated/dummy "
-        "endpoints (orders/users/auth, etc.).\n\n"
+        "endpoint(s) from the OpenAPI spec for the tool below.\n\n"
+        f"Tool-Specific Instructions:\n{tool_prompt}\n\n"
         "OpenAPI spec (possibly truncated):\n"
         f"{spec_text}\n\n"
         "Tool Definition:\n"
@@ -31,10 +89,11 @@ def build_user_prompt(tool: dict, spec_text: str) -> str:
         f"Input Schema: {json.dumps(tool.get('input_schema', {}))}\n"
         f"Output Schema: {json.dumps(tool.get('output_schema', {}))}\n\n"
         "Requirements:\n"
-        "- Prefer endpoints under /products (e.g., /products/search or /products) for product search.\n"
-        "- Do NOT use endpoints from other domains like orders, users, or auth unless no product endpoints exist.\n"
-        "- Return only valid Python code. Avoid markdown fences in the response.\n"
-        "- If multiple endpoints fit, pick the simplest that supports keyword search.\n"
+        "- Identify endpoints that best satisfy the tool description and schemas.\n"
+        "- Ignore endpoints whose domain or schema does not align with the tool.\n"
+        "- Return only valid Python code. No markdown fences, no prose, no comments.\n"
+        "- Prefer a single top-level function (no class) unless a class is required by the tool shape.\n"
+        "- If multiple endpoints fit, pick the simplest correct option.\n"
         "- Ensure output matches the provided output schema."
     )
 
@@ -54,16 +113,21 @@ def generate_tools(template_path: str, openapi_path: str, model: str, max_chars:
 
     for tool in tools:
         user_prompt = build_user_prompt(tool, spec_text)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-        )
-        content = resp.choices[0].message.content
+        content = call_model(client, model, system_prompt, user_prompt)
 
-        print("\n=== Tool Output: {name} ===".format(name=tool.get("name", "unknown")))
+        # Minimal quality guard: if the output doesn't match required format, retry once with a corrective instruction.
+        tool_name = tool.get("name", "tool")
+        missing = validate_tool_function_only(content, tool_name)
+        if missing:
+            fix_prompt = (
+                user_prompt
+                + "\n\nFORMAT FIX REQUIRED:\n"
+                + f"The output is missing: {', '.join(missing)}.\n"
+                + "Regenerate the entire file to satisfy ALL format requirements. Return ONLY Python code."
+            )
+            content = call_model(client, model, system_prompt, fix_prompt)
+
+        print("\n=== Tool Output: {name} ===".format(name=tool_name))
         print(content)
 
         if output_dir:

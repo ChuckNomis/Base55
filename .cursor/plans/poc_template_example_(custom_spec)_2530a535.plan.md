@@ -79,6 +79,3 @@ flowchart TD
 
 
 ## Implementation todos
-
-- `add-template-json`: Create `POC/template_products.json` (Products template, one tool).
-- `add-custom-openapi-with-dummies`: Create `POC/sample_openapi.json` with product endpoints plus wrong-domain dummy endpoints.
