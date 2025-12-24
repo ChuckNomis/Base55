@@ -1,0 +1,37 @@
+{
+  "template_id": "products",
+  "generation_prompt": "You are an expert Python backend developer. Given an OpenAPI spec and the tool definition below, generate a FastMCP-compatible Python tool that matches the spec and returns data shaped to the output schema.",
+  "tools": [
+    {
+      "name": "search_products",
+      "description": "Search for products by a keyword",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string" }
+        },
+        "required": ["query"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "price": { "type": "number" },
+                "image_url": { "type": "string" }
+              },
+              "required": ["id", "title", "price"]
+            }
+          }
+        },
+        "required": ["products"]
+      }
+    }
+  ]
+}
+
