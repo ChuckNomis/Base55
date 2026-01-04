@@ -75,7 +75,3 @@ flowchart TD
   generator -->|"prompt per tool"| llm[OpenAIModel]
   llm --> output[GeneratedFastMCPCodePrintedOrSaved]
 ```
-
-
-
-## Implementation todos

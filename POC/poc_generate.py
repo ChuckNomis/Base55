@@ -3,6 +3,7 @@ import json
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     # Load environment variables from .env if available (optional dependency)
@@ -17,6 +18,13 @@ from openai import OpenAI
 
 
 def load_json(path: str) -> dict:
+    parsed = urlparse(path)
+    if parsed.scheme in ("http", "https"):
+        import httpx
+
+        resp = httpx.get(path, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -42,7 +50,7 @@ def extract_code_only(content: str) -> str:
     return content.strip()
 
 
-def validate_tool_function_only(code: str, tool_name: str) -> list[str]:
+def validate_tool_function_only(code: str, tool_name: str, expected_server_url: str | None) -> list[str]:
     missing: list[str] = []
     if f"def {tool_name}" not in code and f"async def {tool_name}" not in code:
         missing.append(f"function definition for {tool_name}")
@@ -53,6 +61,19 @@ def validate_tool_function_only(code: str, tool_name: str) -> list[str]:
         missing.append("remove @mcp.tool (POC requires function-only output)")
     if "FastMCP" in code or "mcp = " in code:
         missing.append("remove FastMCP/mcp server wiring (POC requires function-only output)")
+    # Keep output minimal and predictable for post-processing.
+    if re.search(r"^\s*#.*$", code, flags=re.MULTILINE) or re.search(r"\s#.+$", code):
+        missing.append("remove comments")
+    # Prevent placeholder URLs that won't work in real demos.
+    if "example.com" in code or "api.example.com" in code:
+        missing.append("remove placeholder example.com URLs")
+    # For this demo stack, require a configurable base URL.
+    if "DEMO_API_BASE_URL" not in code:
+        missing.append("configurable base URL via DEMO_API_BASE_URL env var")
+    # For the 'random API' use case: the default MUST come from the OpenAPI `servers[].url`.
+    if expected_server_url:
+        if expected_server_url not in code:
+            missing.append(f"use OpenAPI servers[0].url as default base URL: {expected_server_url}")
     # rough check for docstring: triple quotes somewhere after def line
     if f"def {tool_name}" in code or f"async def {tool_name}" in code:
         # Heuristic: require any triple-quote in file
@@ -103,6 +124,17 @@ def generate_tools(template_path: str, openapi_path: str, model: str, max_chars:
     openapi_spec = load_json(openapi_path)
 
     spec_text = truncate_json_for_prompt(openapi_spec, max_chars)
+    expected_server_url: str | None = None
+    servers = openapi_spec.get("servers")
+    if isinstance(servers, list) and servers:
+        first = servers[0]
+        if isinstance(first, dict):
+            url = first.get("url")
+            if isinstance(url, str) and url.strip():
+                candidate = url.strip()
+                # Only enforce absolute URLs; many OpenAPI generators omit servers or use "/" which is not useful here.
+                if candidate.startswith("http://") or candidate.startswith("https://"):
+                    expected_server_url = candidate
     system_prompt = template["generation_prompt"]
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -117,7 +149,7 @@ def generate_tools(template_path: str, openapi_path: str, model: str, max_chars:
 
         # Minimal quality guard: if the output doesn't match required format, retry once with a corrective instruction.
         tool_name = tool.get("name", "tool")
-        missing = validate_tool_function_only(content, tool_name)
+        missing = validate_tool_function_only(content, tool_name, expected_server_url)
         if missing:
             fix_prompt = (
                 user_prompt
