@@ -1,0 +1,51 @@
+[
+  {
+    "id": "p-100",
+    "title": "Widget Pro",
+    "price": 19.99,
+    "description": "Versatile widget for everyday tasks.",
+    "image_url": "https://cdn.example.com/img/widget-pro.png",
+    "category": "widgets"
+  },
+  {
+    "id": "p-101",
+    "title": "Widget Mini",
+    "price": 9.99,
+    "description": "Compact widget ideal for travel.",
+    "image_url": "https://cdn.example.com/img/widget-mini.png",
+    "category": "widgets"
+  },
+  {
+    "id": "p-102",
+    "title": "Gadget Alpha",
+    "price": 29.5,
+    "description": "Durable gadget with extended battery.",
+    "image_url": "https://cdn.example.com/img/gadget-alpha.png",
+    "category": "gadgets"
+  },
+  {
+    "id": "p-103",
+    "title": "Gadget Beta",
+    "price": 24.0,
+    "description": "Lightweight gadget for daily use.",
+    "image_url": "https://cdn.example.com/img/gadget-beta.png",
+    "category": "gadgets"
+  },
+  {
+    "id": "p-104",
+    "title": "Accessory Pack",
+    "price": 12.75,
+    "description": "Bundle of widget and gadget accessories.",
+    "image_url": "https://cdn.example.com/img/accessory-pack.png",
+    "category": "accessories"
+  },
+  {
+    "id": "p-105",
+    "title": "Widget Pro XL",
+    "price": 34.99,
+    "description": "Larger widget for heavy-duty scenarios.",
+    "image_url": "https://cdn.example.com/img/widget-pro-xl.png",
+    "category": "widgets"
+  }
+]
+
