@@ -1,0 +1,66 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { registerAppTool, registerAppResource } from '@modelcontextprotocol/ext-apps/server';
+import { createUIResource } from '@mcp-ui/server';
+import { z } from 'zod';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// ── MCP Server Setup ──────────────────────────────────────────────────────────
+
+const server = new McpServer({ name: 'Generated Commerce MCP', version: '1.0.0' });
+
+// ── Generated Tool Functions ──────────────────────────────────────────────────
+
+{{#each tools}}
+{{{this.code}}}
+
+{{/each}}
+
+// ── UI Resources ──────────────────────────────────────────────────────────────
+
+const carouselHtml = fs.readFileSync(path.join(__dirname, 'carousel.html'), 'utf-8');
+
+const productsUI = createUIResource({
+  uri: 'ui://products/carousel',
+  content: {
+    type: 'rawHtml',
+    htmlString: carouselHtml
+  },
+  encoding: 'text'
+});
+
+registerAppResource(server, 'products_carousel_ui', productsUI.resource.uri, {}, async () => ({
+  contents: [{
+    ...productsUI.resource,
+    mimeType: 'text/html;profile=mcp-app'
+  }]
+}));
+
+// ── Tool Registrations ────────────────────────────────────────────────────────
+
+{{#each tools}}
+registerAppTool(server, '{{this.name}}', {
+  description: '{{this.description}}',
+  inputSchema: z.object({
+    query: z.string().describe('Search keyword for products')
+  }),
+  _meta: { ui: { resourceUri: productsUI.resource.uri } }
+}, async (input: { query: string }) => {
+  const result = await {{this.name}}(input.query);
+  return {
+    content: [{ type: 'text', text: JSON.stringify(result) }]
+  };
+});
+
+{{/each}}
+
+// ── Server Start ──────────────────────────────────────────────────────────────
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error('Generated MCP Server is running!');
+}
+
+main().catch(console.error);

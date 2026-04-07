@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dev/assembler/dist/
+dev/generated_server/
+
+# Generated output
+generated/

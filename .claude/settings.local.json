@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python .claude/skills/skill-audit/scripts/scanner.py)",
+      "Bash(python .claude/skills/skill-audit/scripts/scanner.py \"C:\\\\Users\\\\nadav\\\\Documents\\\\GitHub\\\\Base55\\\\.claude\\\\skills\\\\skill-audit\")",
+      "mcp__plugin_postman_postman__getAuthenticatedUser",
+      "mcp__plugin_postman_postman__getWorkspaces",
+      "mcp__plugin_postman_postman__getCollections",
+      "mcp__plugin_postman_postman__getAllSpecs",
+      "mcp__plugin_postman_postman__createSpec",
+      "mcp__plugin_postman_postman__createEnvironment",
+      "mcp__plugin_postman_postman__generateCollection",
+      "mcp__plugin_postman_postman__getAsyncSpecTaskStatus",
+      "Skill(keybindings-help)",
+      "Bash(grep -E \"\\\\.\\(md|json|txt|yaml\\)$\")",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(.venv/Scripts/pip install:*)",
+      "Bash(.venv/Scripts/python -c \"from dev.generator.core import make_all_tools; from dev.generator.models import ToolsManifest; print\\('imports OK'\\)\")"
+    ]
+  }
+}

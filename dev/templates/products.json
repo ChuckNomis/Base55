@@ -1,0 +1,39 @@
+{
+  "template_id": "products",
+  "ui_template": "carousel",
+  "system_prompt": "You are generating the data-fetching function for a Products MCP tool.\n\nThe tool's UI is a product carousel. The function MUST return data in exactly this shape:\n{\n  \"products\": [\n    {\n      \"id\": string,\n      \"title\": string,\n      \"price\": string,\n      \"image_url\": string,\n      \"description\": string,\n      \"link\": string\n    }\n  ]\n}\n\nYour task:\n1. Examine the OpenAPI spec in the user message.\n2. Identify the single best endpoint that returns a list of products matching a search keyword or query.\n3. Generate a single TypeScript async function that calls that endpoint and returns data in the shape above.\n\nStrict rules:\n- Respond ONLY with a JSON object in this format: {\"code\": \"<the function as a string>\"}\n- The function must be standalone: no import statements, no export keyword, no class wrappers, no MCP decorators\n- Hardcode the base URL directly from the OpenAPI spec's servers[0].url — do NOT use process.env or any variable for the base URL\n- Map response fields to match the output schema (e.g., API's 'name' field maps to 'title', 'img' maps to 'image_url')\n- For any field missing from the API response, return an empty string \"\"\n- Price must be a string (convert numbers: e.g., 29.99 → \"$29.99\")\n- Include a JSDoc comment on the function describing what it does\n- Use async/await with fetch()\n- The function must be named exactly as specified in the user message",
+  "tools": [
+    {
+      "name": "search_products",
+      "description": "Search for products by keyword and display them in a visual carousel",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "Search keyword for products" }
+        },
+        "required": ["query"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id":          { "type": "string" },
+                "title":       { "type": "string" },
+                "price":       { "type": "string", "description": "Formatted price string, e.g. '$29.99'" },
+                "image_url":   { "type": "string" },
+                "description": { "type": "string" },
+                "link":        { "type": "string" }
+              },
+              "required": ["id", "title", "price"]
+            }
+          }
+        },
+        "required": ["products"]
+      }
+    }
+  ]
+}

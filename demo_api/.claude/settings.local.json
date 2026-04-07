@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import httpx, openai, pydantic; print\\('deps ok'\\)\")",
+      "Bash(curl -s http://127.0.0.1:8001/health)",
+      "Bash(python -m dev.generator.generate --openapi http://127.0.0.1:8001/openapi.json --template dev/templates/products.json --output-dir dev/generated_server/)",
+      "Bash(npm install:*)",
+      "Bash(npm start:*)",
+      "Bash(node dev/assembler/dist/index.js --manifest dev/generated_server/tools_manifest.json --output dev/generated_server/)"
+    ]
+  }
+}

@@ -1,0 +1,195 @@
+openapi: 3.0.3
+info:
+  title: Demo Commerce API
+  version: 1.0.0
+  description: A simple product catalogue API with listing, keyword search, and health check endpoints.
+
+servers:
+  - url: http://127.0.0.1:8001
+
+paths:
+  /v1/products:
+    get:
+      operationId: listProducts
+      summary: List products
+      description: Returns a paginated list of products, optionally filtered by category.
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Optional category filter (e.g. "widgets", "gadgets").
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of products to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: A list of products.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+              example:
+                - id: p-100
+                  title: Widget Pro
+                  price: 19.99
+                  description: Versatile widget for everyday tasks.
+                  image_url: https://cdn.example.com/img/widget-pro.png
+                  category: widgets
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /v1/products/search:
+    get:
+      operationId: searchProducts
+      summary: Search products by keyword
+      description: >
+        Searches product titles and descriptions for the provided keyword.
+        Uses a simple stemming algorithm so that e.g. "widget" also matches "widgets".
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Keyword to search for across product titles and descriptions.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of products to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: A list of matching products.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+              example:
+                - id: p-100
+                  title: Widget Pro
+                  price: 19.99
+                  description: Versatile widget for everyday tasks.
+                  image_url: https://cdn.example.com/img/widget-pro.png
+                  category: widgets
+        "400":
+          description: Query string was empty.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+              example:
+                detail: Query must not be empty.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      description: Returns the current health status of the API.
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+              example:
+                status: ok
+
+components:
+  schemas:
+    Product:
+      type: object
+      required:
+        - id
+        - title
+        - price
+      properties:
+        id:
+          type: string
+          description: Unique product identifier.
+          example: p-100
+        title:
+          type: string
+          description: Display name of the product.
+          example: Widget Pro
+        price:
+          type: number
+          format: float
+          description: Price in USD.
+          example: 19.99
+        description:
+          type: string
+          nullable: true
+          description: Optional product description.
+          example: Versatile widget for everyday tasks.
+        image_url:
+          type: string
+          nullable: true
+          description: Optional URL to the product image.
+          example: https://cdn.example.com/img/widget-pro.png
+        category:
+          type: string
+          nullable: true
+          description: Optional product category (e.g. "widgets", "gadgets").
+          example: widgets
+
+    ErrorDetail:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Human-readable error message.
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
+
+  responses:
+    ValidationError:
+      description: Request validation error (invalid query parameter types or values).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+          example:
+            detail:
+              - loc:
+                  - query
+                  - limit
+                msg: value is not a valid integer
+                type: type_error.integer
