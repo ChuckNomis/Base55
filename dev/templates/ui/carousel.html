@@ -133,53 +133,60 @@
       }).join('');
     }
 
-    // MCP Apps Protocol: announce readiness to the host
-    window.parent.postMessage({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'ui/initialize',
-      params: { protocolVersion: '2025-06-18', capabilities: {} }
-    }, '*');
+    // MCP Apps Protocol: proper handshake
+    var mcpInitId = Date.now();
 
-    window.parent.postMessage({
-      jsonrpc: '2.0',
-      method: 'ui/notifications/initialized',
-      params: {}
-    }, '*');
-
-    // Receive product data from the MCP host
     window.addEventListener('message', function(event) {
       var msg = event.data;
-      if (!msg || typeof msg !== 'object') return;
+      if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
 
-      // Direct products array
-      if (Array.isArray(msg.products)) {
-        renderProducts(msg.products);
+      // Step 2: host responded to ui/initialize — now send initialized notification
+      if (msg.id === mcpInitId && msg.result !== undefined) {
+        window.parent.postMessage({
+          jsonrpc: '2.0',
+          method: 'ui/notifications/initialized',
+          params: {}
+        }, '*');
         return;
       }
 
-      // MCP ui/data method
-      if (msg.method === 'ui/data' && msg.params && Array.isArray(msg.params.products)) {
-        renderProducts(msg.params.products);
-        return;
-      }
-
-      // Tool result forwarded as JSON text content
-      if (msg.result && Array.isArray(msg.result.content)) {
-        for (var i = 0; i < msg.result.content.length; i++) {
-          var item = msg.result.content[i];
-          if (item.type === 'text') {
-            try {
-              var data = JSON.parse(item.text);
-              if (Array.isArray(data.products)) {
-                renderProducts(data.products);
-                return;
-              }
-            } catch (e) {}
+      // Handle tool result — host forwards this after the tool runs
+      if (msg.method === 'ui/notifications/tool-result' && msg.params) {
+        var content = msg.params.content;
+        if (Array.isArray(content)) {
+          for (var i = 0; i < content.length; i++) {
+            var item = content[i];
+            if (item.type === 'text') {
+              try {
+                var data = JSON.parse(item.text);
+                if (Array.isArray(data.products)) {
+                  renderProducts(data.products);
+                  return;
+                }
+              } catch (e) {}
+            }
           }
         }
+        return;
+      }
+
+      // Fallback: direct products payload
+      if (msg.products && Array.isArray(msg.products)) {
+        renderProducts(msg.products);
       }
     });
+
+    // Step 1: send ui/initialize request — wait for host response before continuing
+    window.parent.postMessage({
+      jsonrpc: '2.0',
+      id: mcpInitId,
+      method: 'ui/initialize',
+      params: {
+        appInfo: { name: 'Products Carousel', version: '1.0.0' },
+        appCapabilities: {},
+        protocolVersion: '2026-01-26'
+      }
+    }, '*');
   </script>
 </body>
 </html>
