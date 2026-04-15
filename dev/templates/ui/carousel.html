@@ -107,133 +107,86 @@
   </div>
 
   <script>
-    var _msgId = 2;
-    function openLink(url) {
-      window.parent.postMessage({
-        jsonrpc: '2.0',
-        id: _msgId++,
-        method: 'ui/open-link',
-        params: { url: url }
-      }, '*');
-    }
-
     function renderProducts(products) {
       const carousel = document.getElementById('carousel');
       if (!products || products.length === 0) {
         carousel.innerHTML = '<div class="status">No products found.</div>';
         return;
       }
-
-      carousel.innerHTML = products.map(function(p, idx) {
+      carousel.innerHTML = products.map(function(p) {
+        const imgHtml = p.image_url
+          ? '<img src="' + p.image_url + '" alt="' + (p.title || '') + '" onerror="this.parentElement.innerHTML=\'<span class=\\\"placeholder\\\">PHOTO</span>\'">'
+          : '<span class="placeholder">PHOTO</span>';
         const price = p.price || '';
+        const link = p.link || '#';
         return (
           '<div class="card">' +
-            '<div class="card-img" id="img-wrap-' + idx + '"><span class="placeholder">PHOTO</span></div>' +
+            '<div class="card-img">' + imgHtml + '</div>' +
             '<div class="card-body">' +
               '<div class="card-title">' + (p.title || '') + '</div>' +
               '<div class="card-price">' + price + '</div>' +
               '<div class="card-desc">' + (p.description || '') + '</div>' +
             '</div>' +
-            (p.link ? '<button class="card-btn" id="btn-' + idx + '">VIEW</button>' : '') +
+            '<a class="card-btn" href="' + link + '" target="_blank">VIEW</a>' +
           '</div>'
         );
       }).join('');
-
-      // Load images via fetch → blob URL (bypasses img-src CSP, uses connectDomains allowlist)
-      // Attach button listeners
-      products.forEach(function(p, idx) {
-        var wrap = document.getElementById('img-wrap-' + idx);
-        if (wrap && p.image_url) {
-          fetch(p.image_url)
-            .then(function(r) { return r.blob(); })
-            .then(function(blob) {
-              var objectUrl = URL.createObjectURL(blob);
-              var img = document.createElement('img');
-              img.alt = p.title || '';
-              img.src = objectUrl;
-              wrap.innerHTML = '';
-              wrap.appendChild(img);
-            })
-            .catch(function() { /* keep placeholder */ });
-        }
-        if (p.link) {
-          var btn = document.getElementById('btn-' + idx);
-          if (btn) {
-            btn.addEventListener('click', function() { openLink(p.link); });
-          }
-        }
-      });
     }
 
-    // MCP Apps Protocol: announce readiness to the host
-    window.parent.postMessage({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'ui/initialize',
-      params: {
-        protocolVersion: '2026-01-26',
-        capabilities: {
-          connectDomains: [
-            'upload.wikimedia.org',
-            'images.samsung.com',
-            'store.google.com',
-            'images.unsplash.com',
-            'www.apple.com'
-          ]
-        }
-      }
-    }, '*');
+    // MCP Apps Protocol: proper handshake
+    var mcpInitId = Date.now();
 
-    window.parent.postMessage({
-      jsonrpc: '2.0',
-      method: 'ui/notifications/initialized',
-      params: {}
-    }, '*');
-
-    // Receive product data from the MCP host
     window.addEventListener('message', function(event) {
       var msg = event.data;
-      if (!msg || typeof msg !== 'object') return;
+      if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
 
-      // Direct products array
-      if (Array.isArray(msg.products)) {
+      // Step 2: host responded to ui/initialize — now send initialized notification
+      if (msg.id === mcpInitId && msg.result !== undefined) {
+        window.parent.postMessage({
+          jsonrpc: '2.0',
+          method: 'ui/notifications/initialized',
+          params: {}
+        }, '*');
+        return;
+      }
+
+      // Handle tool result — host forwards this after the tool runs
+      if (msg.method === 'ui/notifications/tool-result' && msg.params) {
+        var content = msg.params.content;
+        if (Array.isArray(content)) {
+          for (var i = 0; i < content.length; i++) {
+            var item = content[i];
+            if (item.type === 'text') {
+              try {
+                var data = JSON.parse(item.text);
+                if (Array.isArray(data.products)) {
+                  renderProducts(data.products);
+                  return;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        return;
+      }
+
+      // Fallback: direct products payload
+      if (msg.products && Array.isArray(msg.products)) {
         renderProducts(msg.products);
-        return;
-      }
-
-      // MCP Apps: ui/notifications/tool-result
-      if (msg.method === 'ui/notifications/tool-result' && msg.params && Array.isArray(msg.params.content)) {
-        for (var i = 0; i < msg.params.content.length; i++) {
-          var item = msg.params.content[i];
-          if (item.type === 'text') {
-            try {
-              var data = JSON.parse(item.text);
-              if (Array.isArray(data.products)) {
-                renderProducts(data.products);
-                return;
-              }
-            } catch (e) {}
-          }
-        }
-        return;
-      }
-
-      // Tool result forwarded as JSON text content (legacy/fallback)
-      if (msg.result && Array.isArray(msg.result.content)) {
-        for (var i = 0; i < msg.result.content.length; i++) {
-          var item = msg.result.content[i];
-          if (item.type === 'text') {
-            try {
-              var data = JSON.parse(item.text);
-              if (Array.isArray(data.products)) {
-                renderProducts(data.products);
-                return;
-              }
-            } catch (e) {}
-          }
-        }
       }
     });
+
+    // Step 1: send ui/initialize request — wait for host response before continuing
+    window.parent.postMessage({
+      jsonrpc: '2.0',
+      id: mcpInitId,
+      method: 'ui/initialize',
+      params: {
+        appInfo: { name: 'Products Carousel', version: '1.0.0' },
+        appCapabilities: {},
+        protocolVersion: '2026-01-26'
+      }
+    }, '*');
   </script>
 </body>
 </html>
