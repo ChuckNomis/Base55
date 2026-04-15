@@ -1,0 +1,11 @@
+{
+	"servers": {
+		"mcpuitest": {
+			"type": "stdio",
+			"command": "cmd",
+			"args": ["/c", "npx", "tsx", "index.ts"],
+			"cwd": "${workspaceFolder}/dev/generated_server"
+		}
+	},
+	"inputs": []
+}

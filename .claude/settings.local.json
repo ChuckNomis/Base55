@@ -16,7 +16,10 @@
       "Bash(npm install:*)",
       "Bash(npm run:*)",
       "Bash(.venv/Scripts/pip install:*)",
-      "Bash(.venv/Scripts/python -c \"from dev.generator.core import make_all_tools; from dev.generator.models import ToolsManifest; print\\('imports OK'\\)\")"
+      "Bash(.venv/Scripts/python -c \"from dev.generator.core import make_all_tools; from dev.generator.models import ToolsManifest; print\\('imports OK'\\)\")",
+      "Read(//c/Users/nadav/.vscode/**)",
+      "Read(//c/Users/nadav/AppData/Roaming/Code/**)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

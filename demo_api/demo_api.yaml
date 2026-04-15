@@ -1,8 +1,10 @@
 openapi: 3.0.3
 info:
   title: Demo Commerce API
-  version: 1.0.0
-  description: A simple product catalogue API with listing, keyword search, and health check endpoints.
+  version: 1.1.0
+  description: >
+    A realistic demo commerce service with pagination, filtering, and
+    search endpoints suitable for MCP tool generation workflows.
 
 servers:
   - url: http://127.0.0.1:8001
@@ -12,18 +14,73 @@ paths:
     get:
       operationId: listProducts
       summary: List products
-      description: Returns a paginated list of products, optionally filtered by category.
+      description: >
+        Returns a paginated, optionally filtered and sorted list of products.
+        Supports free-text search, category/brand filtering, price range
+        filtering, stock availability filtering, and multiple sort strategies.
       parameters:
+        - name: q
+          in: query
+          required: false
+          description: >
+            Free-text product query. Uses stemming to search across
+            title, description, category, brand, and tags.
+          schema:
+            type: string
         - name: category
           in: query
           required: false
-          description: Optional category filter (e.g. "widgets", "gadgets").
+          description: Filter by category (case-insensitive exact match).
           schema:
             type: string
-        - name: limit
+        - name: brand
           in: query
           required: false
-          description: Maximum number of products to return.
+          description: Filter by brand (case-insensitive exact match).
+          schema:
+            type: string
+        - name: min_price
+          in: query
+          required: false
+          description: Minimum price filter (inclusive).
+          schema:
+            type: number
+            format: float
+            minimum: 0
+        - name: max_price
+          in: query
+          required: false
+          description: Maximum price filter (inclusive).
+          schema:
+            type: number
+            format: float
+            minimum: 0
+        - name: in_stock
+          in: query
+          required: false
+          description: When true, only return products with stock_quantity > 0.
+          schema:
+            type: boolean
+        - name: sort_by
+          in: query
+          required: false
+          description: Sort strategy for the results.
+          schema:
+            type: string
+            enum: [relevance, price_asc, price_desc, title_asc]
+            default: relevance
+        - name: page
+          in: query
+          required: false
+          description: 1-based page index.
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          required: false
+          description: Number of products per page.
           schema:
             type: integer
             minimum: 1
@@ -31,20 +88,31 @@ paths:
             default: 20
       responses:
         "200":
-          description: A list of products.
+          description: A paginated list of products.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Product"
+                $ref: "#/components/schemas/ProductListResponse"
               example:
-                - id: p-100
-                  title: Widget Pro
-                  price: 19.99
-                  description: Versatile widget for everyday tasks.
-                  image_url: https://cdn.example.com/img/widget-pro.png
-                  category: widgets
+                items:
+                  - id: p-100
+                    sku: WGT-PRO-001
+                    title: Widget Pro
+                    price: 19.99
+                    currency: USD
+                    description: Versatile widget for everyday tasks.
+                    image_url: https://cdn.example.com/img/widget-pro.png
+                    link: https://shop.example.com/products/widget-pro
+                    category: widgets
+                    brand: WidgetCo
+                    tags: [widget, pro, everyday]
+                    stock_quantity: 42
+                    in_stock: true
+                    rating: 4.5
+                total: 1
+                page: 1
+                page_size: 20
+                has_next: false
         "422":
           $ref: "#/components/responses/ValidationError"
 
@@ -53,13 +121,21 @@ paths:
       operationId: searchProducts
       summary: Search products by keyword
       description: >
-        Searches product titles and descriptions for the provided keyword.
-        Uses a simple stemming algorithm so that e.g. "widget" also matches "widgets".
+        Compatibility endpoint for MCP generation demos. Accepts either q or
+        query (alias), then returns a flat list. Uses a simple stemming
+        algorithm to search product titles, descriptions, categories, brands,
+        and tags so that e.g. "widget" also matches "widgets".
       parameters:
         - name: q
           in: query
-          required: true
-          description: Keyword to search for across product titles and descriptions.
+          required: false
+          description: Keyword to search products.
+          schema:
+            type: string
+        - name: query
+          in: query
+          required: false
+          description: Alias for q used by generated MCP tools.
           schema:
             type: string
         - name: limit
@@ -73,28 +149,81 @@ paths:
             default: 10
       responses:
         "200":
-          description: A list of matching products.
+          description: A flat list of matching products.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Product"
+                  $ref: "#/components/schemas/ProductListItem"
               example:
                 - id: p-100
+                  sku: WGT-PRO-001
                   title: Widget Pro
                   price: 19.99
+                  currency: USD
                   description: Versatile widget for everyday tasks.
                   image_url: https://cdn.example.com/img/widget-pro.png
+                  link: https://shop.example.com/products/widget-pro
                   category: widgets
+                  brand: WidgetCo
+                  tags: [widget, pro, everyday]
+                  stock_quantity: 42
+                  in_stock: true
+                  rating: 4.5
         "400":
-          description: Query string was empty.
+          description: Neither q nor query was provided, or both were empty.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorDetail"
               example:
-                detail: Query must not be empty.
+                detail: Either q or query must be provided.
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /v1/products/id/{product_id}:
+    get:
+      operationId: getProduct
+      summary: Get product by id
+      description: Returns a single product by its stable identifier.
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          description: The unique product identifier.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The requested product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListItem"
+              example:
+                id: p-100
+                sku: WGT-PRO-001
+                title: Widget Pro
+                price: 19.99
+                currency: USD
+                description: Versatile widget for everyday tasks.
+                image_url: https://cdn.example.com/img/widget-pro.png
+                link: https://shop.example.com/products/widget-pro
+                category: widgets
+                brand: WidgetCo
+                tags: [widget, pro, everyday]
+                stock_quantity: 42
+                in_stock: true
+                rating: 4.5
+        "404":
+          description: Product not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorDetail"
+              example:
+                detail: Product not found.
         "422":
           $ref: "#/components/responses/ValidationError"
 
@@ -102,58 +231,154 @@ paths:
     get:
       operationId: healthCheck
       summary: Health check
-      description: Returns the current health status of the API.
+      description: Returns the current health status, API version, and uptime of the service.
       responses:
         "200":
           description: Service is healthy.
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: ok
+                $ref: "#/components/schemas/HealthResponse"
               example:
                 status: ok
+                version: "1.1.0"
+                uptime_seconds: 3600
 
 components:
   schemas:
-    Product:
+    ProductListItem:
       type: object
       required:
         - id
+        - sku
         - title
         - price
+        - currency
+        - stock_quantity
+        - in_stock
       properties:
         id:
           type: string
-          description: Unique product identifier.
+          description: Stable product identifier.
           example: p-100
+        sku:
+          type: string
+          description: Seller stock keeping unit.
+          example: WGT-PRO-001
         title:
           type: string
           description: Display name of the product.
           example: Widget Pro
-        price:
-          type: number
-          format: float
-          description: Price in USD.
-          example: 19.99
         description:
           type: string
           nullable: true
           description: Optional product description.
           example: Versatile widget for everyday tasks.
+        category:
+          type: string
+          nullable: true
+          description: Optional product category.
+          example: widgets
+        brand:
+          type: string
+          nullable: true
+          description: Optional brand name.
+          example: WidgetCo
+        tags:
+          type: array
+          items:
+            type: string
+          description: List of tags associated with the product.
+          example: [widget, pro, everyday]
+        price:
+          type: number
+          format: float
+          description: Price in the product's currency.
+          example: 19.99
+        currency:
+          type: string
+          description: ISO 4217 currency code (e.g. "USD").
+          minLength: 3
+          maxLength: 3
+          example: USD
         image_url:
           type: string
           nullable: true
           description: Optional URL to the product image.
           example: https://cdn.example.com/img/widget-pro.png
-        category:
+        link:
           type: string
           nullable: true
-          description: Optional product category (e.g. "widgets", "gadgets").
-          example: widgets
+          description: Canonical product page URL.
+          example: https://shop.example.com/products/widget-pro
+        stock_quantity:
+          type: integer
+          description: Number of units currently in stock.
+          example: 42
+        in_stock:
+          type: boolean
+          description: True when stock_quantity is greater than zero.
+          example: true
+        rating:
+          type: number
+          format: float
+          nullable: true
+          description: Average customer rating (0–5).
+          minimum: 0
+          maximum: 5
+          example: 4.5
+
+    ProductListResponse:
+      type: object
+      required:
+        - items
+        - total
+        - page
+        - page_size
+        - has_next
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductListItem"
+          description: Products on the current page.
+        total:
+          type: integer
+          description: Total number of products matching the query (before pagination).
+          example: 42
+        page:
+          type: integer
+          description: Current 1-based page index.
+          example: 1
+        page_size:
+          type: integer
+          description: Number of products per page.
+          example: 20
+        has_next:
+          type: boolean
+          description: True when there is at least one more page of results.
+          example: true
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - uptime_seconds
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          description: Always "ok" when the service is healthy.
+          example: ok
+        version:
+          type: string
+          description: Current API version.
+          example: "1.1.0"
+        uptime_seconds:
+          type: integer
+          description: Number of seconds the service has been running since last start.
+          example: 3600
 
     ErrorDetail:
       type: object
