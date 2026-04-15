@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import List, Literal, Set
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, HttpUrl
 
 
 DATA_PATH = Path(__file__).parent / "data" / "products.json"
+IMAGES_PATH = Path(__file__).parent / "data" / "images"
 API_VERSION = "1.1.0"
 STARTED_AT = datetime.now(tz=UTC)
 
@@ -157,6 +159,7 @@ app = FastAPI(
     # Keep an explicit URL so generator logic can reliably read servers[0].url.
     servers=[{"url": "http://127.0.0.1:8001"}],
 )
+app.mount("/images", StaticFiles(directory=IMAGES_PATH), name="images")
 PRODUCTS = load_products()
 
 
