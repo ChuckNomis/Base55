@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Products</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f0f0f;
+      font-family: sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+    }
+    .carousel {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 12px;
+      width: 100%;
+      height: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: #333 #0f0f0f;
+    }
+    .card {
+      flex: 0 0 160px;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card-img {
+      height: 100px;
+      background: #2a2a2a;
+      border-radius: 6px;
+      border: 1px dashed #555;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .card-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+    .card-img .placeholder {
+      color: #777;
+      font-size: 10px;
+    }
+    .card-body {
+      color: #e0e0e0;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .card-title {
+      font-weight: 600;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    .card-price {
+      color: #4ade80;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .card-desc {
+      color: #999;
+      font-size: 10px;
+      line-height: 1.3;
+    }
+    .card-btn {
+      width: 100%;
+      padding: 6px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 11px;
+      text-decoration: none;
+      display: block;
+      text-align: center;
+    }
+    .card-btn:hover { background: #2563eb; }
+    .status {
+      color: #555;
+      font-size: 13px;
+      padding: 20px;
+      text-align: center;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div class="carousel" id="carousel">
+    <div class="status">Loading products...</div>
+  </div>
+
+  <script>
+    function renderProducts(products) {
+      const carousel = document.getElementById('carousel');
+      if (!products || products.length === 0) {
+        carousel.innerHTML = '<div class="status">No products found.</div>';
+        return;
+      }
+      carousel.innerHTML = products.map(function(p) {
+        const imgHtml = p.image_url
+          ? '<img src="' + p.image_url + '" alt="' + (p.title || '') + '" onerror="this.parentElement.innerHTML=\'<span class=\\\"placeholder\\\">PHOTO</span>\'">'
+          : '<span class="placeholder">PHOTO</span>';
+        const price = p.price || '';
+        const link = p.link || '#';
+        return (
+          '<div class="card">' +
+            '<div class="card-img">' + imgHtml + '</div>' +
+            '<div class="card-body">' +
+              '<div class="card-title">' + (p.title || '') + '</div>' +
+              '<div class="card-price">' + price + '</div>' +
+              '<div class="card-desc">' + (p.description || '') + '</div>' +
+            '</div>' +
+            '<a class="card-btn" href="' + link + '" target="_blank">VIEW</a>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    // MCP Apps Protocol: proper handshake
+    var mcpInitId = Date.now();
+
+    window.addEventListener('message', function(event) {
+      var msg = event.data;
+      if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
+
+      // Step 2: host responded to ui/initialize — now send initialized notification
+      if (msg.id === mcpInitId && msg.result !== undefined) {
+        window.parent.postMessage({
+          jsonrpc: '2.0',
+          method: 'ui/notifications/initialized',
+          params: {}
+        }, '*');
+        return;
+      }
+
+      // Handle tool result — host forwards this after the tool runs
+      if (msg.method === 'ui/notifications/tool-result' && msg.params) {
+        var content = msg.params.content;
+        if (Array.isArray(content)) {
+          for (var i = 0; i < content.length; i++) {
+            var item = content[i];
+            if (item.type === 'text') {
+              try {
+                var data = JSON.parse(item.text);
+                if (Array.isArray(data.products)) {
+                  renderProducts(data.products);
+                  return;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        return;
+      }
+
+      // Fallback: direct products payload
+      if (msg.products && Array.isArray(msg.products)) {
+        renderProducts(msg.products);
+      }
+    });
+
+    // Step 1: send ui/initialize request — wait for host response before continuing
+    window.parent.postMessage({
+      jsonrpc: '2.0',
+      id: mcpInitId,
+      method: 'ui/initialize',
+      params: {
+        appInfo: { name: 'Shopify Products Carousel', version: '1.0.0' },
+        appCapabilities: {},
+        protocolVersion: '2026-01-26'
+      }
+    }, '*');
+  </script>
+</body>
+</html>
