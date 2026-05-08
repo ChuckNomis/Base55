@@ -140,7 +140,7 @@
       var msg = event.data;
       if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
 
-      // Step 2: host responded to ui/initialize — now send initialized notification
+      // Step 2: host responded to ui/initialize -- now send initialized notification
       if (msg.id === mcpInitId && msg.result !== undefined) {
         window.parent.postMessage({
           jsonrpc: '2.0',
@@ -150,7 +150,7 @@
         return;
       }
 
-      // Handle tool result — host forwards this after the tool runs
+      // Handle tool result -- host forwards this after the tool runs
       if (msg.method === 'ui/notifications/tool-result' && msg.params) {
         var content = msg.params.content;
         if (Array.isArray(content)) {
@@ -176,7 +176,7 @@
       }
     });
 
-    // Step 1: send ui/initialize request — wait for host response before continuing
+    // Step 1: send ui/initialize request -- wait for host response before continuing
     window.parent.postMessage({
       jsonrpc: '2.0',
       id: mcpInitId,

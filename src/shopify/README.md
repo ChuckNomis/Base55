@@ -11,7 +11,7 @@ When you ask Claude to search for products, it calls the Shopify Storefront API 
 ### 1. Install dependencies
 
 ```bash
-cd mcpUiShopifyDemo
+cd src/shopify
 npm install
 ```
 
@@ -40,13 +40,13 @@ Add the following entry inside `"mcpServers"`:
   "mcpServers": {
     "shopify-products": {
       "command": "npx",
-      "args": ["tsx", "C:/path/to/mcpUiShopifyDemo/index.ts"]
+      "args": ["tsx", "C:/path/to/src/shopify/index.ts"]
     }
   }
 }
 ```
 
-Replace `C:/path/to/mcpUiShopifyDemo` with the actual absolute path to this folder on your machine.
+Replace `C:/path/to/src/shopify` with the actual absolute path to this folder on your machine.
 
 ### 4. Restart Claude Desktop
 

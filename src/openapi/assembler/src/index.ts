@@ -33,8 +33,8 @@ function main() {
 
   const manifest: ToolsManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
-  // Templates are at dev/templates/ relative to dev/assembler/
-  const templatesDir = path.join(__dirname, '..', '..', 'templates');
+  // Templates are at templates/ relative to repo root
+  const templatesDir = path.join(__dirname, '..', '..', '..', '..', 'templates');
   const serverHbs = fs.readFileSync(path.join(templatesDir, 'mcp_server', 'server.hbs'), 'utf-8');
   const carouselHtml = fs.readFileSync(path.join(templatesDir, 'ui', 'carousel.html'), 'utf-8');
 

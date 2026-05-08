@@ -2,10 +2,10 @@
 CLI entrypoint for the Base55 generator.
 
 Usage:
-    python -m dev.generator.generate \
+    python -m src.openapi.generator.generate \
         --openapi http://127.0.0.1:8001/openapi.json \
-        --template dev/templates/products.json \
-        --output-dir dev/generated_server/
+        --template templates/products.json \
+        --output-dir src/openapi/generated_server/
 """
 
 import argparse
@@ -70,7 +70,7 @@ def main():
             sys.exit(1)
     else:
         print(f"[Generator] Assembler not built yet.")
-        print(f"[Generator] To build: cd dev/assembler && npm install && npm run build")
+        print(f"[Generator] To build: cd src/openapi/assembler && npm install && npm run build")
         print(f"[Generator] Manifest saved to {manifest_path} — you can run the assembler manually.")
 
 

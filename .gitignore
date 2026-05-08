@@ -14,8 +14,11 @@ build/
 
 # Node
 node_modules/
-dev/assembler/dist/
-dev/generated_server/
+src/openapi/assembler/dist/
+src/openapi/generated_server/
 
 # Generated output
 generated/
+
+# GSD planning (local only)
+.planning/

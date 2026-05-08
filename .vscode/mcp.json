@@ -4,7 +4,7 @@
 			"type": "stdio",
 			"command": "cmd",
 			"args": ["/c", "npx", "tsx", "index.ts"],
-			"cwd": "${workspaceFolder}/dev/generated_server"
+			"cwd": "${workspaceFolder}/src/openapi/generated_server"
 		}
 	},
 	"inputs": []

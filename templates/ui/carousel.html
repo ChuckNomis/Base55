@@ -5,9 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Products</title>
   <style>
+    :root {
+      --primary-color: #3b82f6;
+      --accent-color: #4ade80;
+      --bg-color: #0f0f0f;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background: #0f0f0f;
+      background: var(--bg-color);
       font-family: sans-serif;
       overflow: hidden;
       height: 100vh;
@@ -23,7 +28,7 @@
       width: 100%;
       height: 100%;
       scrollbar-width: thin;
-      scrollbar-color: #333 #0f0f0f;
+      scrollbar-color: #444 var(--bg-color);
     }
     .card {
       flex: 0 0 160px;
@@ -68,7 +73,7 @@
       line-height: 1.2;
     }
     .card-price {
-      color: #4ade80;
+      color: var(--accent-color);
       font-size: 12px;
       font-weight: bold;
     }
@@ -80,7 +85,7 @@
     .card-btn {
       width: 100%;
       padding: 6px;
-      background: #3b82f6;
+      background: var(--primary-color);
       color: white;
       border: none;
       border-radius: 4px;
@@ -91,7 +96,7 @@
       display: block;
       text-align: center;
     }
-    .card-btn:hover { background: #2563eb; }
+    .card-btn:hover { opacity: 0.85; }
     .status {
       color: #555;
       font-size: 13px;
@@ -107,18 +112,50 @@
   </div>
 
   <script>
+    // CR-01: Validate link URLs — only allow http: and https: schemes
+    function safeHref(url) {
+      if (!url) return '#';
+      try {
+        var parsed = new URL(url);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          return url;
+        }
+      } catch (e) {}
+      return '#';
+    }
+
+    // WR-02: Escape values used in HTML attribute positions
+    function escapeAttr(str) {
+      return (str || '').replace(/&/g, '&amp;')
+                        .replace(/"/g, '&quot;')
+                        .replace(/'/g, '&#x27;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+    }
+
+    // WR-03: fallbackFired guard — set before fallbackTimer so renderProducts
+    // clears the timer even if called before the timeout fires
+    var fallbackFired = false;
+    var fallbackTimer = null;
+
     function renderProducts(products) {
+      // WR-03: cancel fallback timer and prevent double-render
+      fallbackFired = true;
+      clearTimeout(fallbackTimer);
+
       const carousel = document.getElementById('carousel');
       if (!products || products.length === 0) {
         carousel.innerHTML = '<div class="status">No products found.</div>';
         return;
       }
       carousel.innerHTML = products.map(function(p) {
+        // WR-02: escape title for use as an HTML attribute value
         const imgHtml = p.image_url
-          ? '<img src="' + p.image_url + '" alt="' + (p.title || '') + '" onerror="this.parentElement.innerHTML=\'<span class=\\\"placeholder\\\">PHOTO</span>\'">'
+          ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'<span class=\\\"placeholder\\\">PHOTO</span>\'">'
           : '<span class="placeholder">PHOTO</span>';
         const price = p.price || '';
-        const link = p.link || '#';
+        // CR-01: validate link scheme before inserting into href
+        const link = safeHref(p.link);
         return (
           '<div class="card">' +
             '<div class="card-img">' + imgHtml + '</div>' +
@@ -127,18 +164,35 @@
               '<div class="card-price">' + price + '</div>' +
               '<div class="card-desc">' + (p.description || '') + '</div>' +
             '</div>' +
-            '<a class="card-btn" href="' + link + '" target="_blank">VIEW</a>' +
+            // WR-01: rel="noopener noreferrer" prevents tab-napping
+            '<a class="card-btn" href="' + link + '" target="_blank" rel="noopener noreferrer">VIEW</a>' +
           '</div>'
         );
       }).join('');
     }
 
-    // MCP Apps Protocol: proper handshake
-    var mcpInitId = Date.now();
+    // CR-02: Cryptographically random nonce — not predictable like Date.now()
+    var mcpInitId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)))
+          .map(function(b) { return b.toString(16).padStart(2, '0'); })
+          .join('');
+
+    // CR-03: Derive parent origin from document.referrer; fall back to '*' only
+    // when no referrer is available (e.g. direct iframe src load)
+    var parentOrigin = document.referrer ? new URL(document.referrer).origin : '*';
+
+    // CR-03: Track the trusted origin from the first valid inbound MCP message
+    var trustedOrigin = null;
 
     window.addEventListener('message', function(event) {
       var msg = event.data;
       if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
+
+      // CR-03: Record origin on first valid MCP message for subsequent outbound sends
+      if (!trustedOrigin && event.origin) {
+        trustedOrigin = event.origin;
+      }
 
       // Step 2: host responded to ui/initialize — now send initialized notification
       if (msg.id === mcpInitId && msg.result !== undefined) {
@@ -146,11 +200,11 @@
           jsonrpc: '2.0',
           method: 'ui/notifications/initialized',
           params: {}
-        }, '*');
+        }, trustedOrigin || parentOrigin);
         return;
       }
 
-      // Handle tool result — host forwards this after the tool runs
+      // Handle tool result -- host forwards this after the tool runs
       if (msg.method === 'ui/notifications/tool-result' && msg.params) {
         var content = msg.params.content;
         if (Array.isArray(content)) {
@@ -176,7 +230,7 @@
       }
     });
 
-    // Step 1: send ui/initialize request — wait for host response before continuing
+    // Step 1: send ui/initialize request -- wait for host response before continuing
     window.parent.postMessage({
       jsonrpc: '2.0',
       id: mcpInitId,
@@ -186,7 +240,22 @@
         appCapabilities: {},
         protocolVersion: '2026-01-26'
       }
-    }, '*');
+    }, parentOrigin);
+
+    // Self-render fallback: if no MCP host sends products within 500ms, render sample data
+    var sampleProducts = [
+      { title: 'Wireless Headphones', price: '$79.99', image_url: '', description: 'Premium sound quality with noise cancellation.', link: '#' },
+      { title: 'Leather Wallet', price: '$34.99', image_url: '', description: 'Slim profile, genuine leather, RFID blocking.', link: '#' },
+      { title: 'Running Shoes', price: '$119.99', image_url: '', description: 'Lightweight and breathable for daily training.', link: '#' }
+    ];
+    // WR-03: fallbackFired guard prevents overwriting real products that arrived
+    // before the timeout fires
+    fallbackTimer = setTimeout(function() {
+      var carousel = document.getElementById('carousel');
+      if (carousel && carousel.querySelector('.status') && !fallbackFired) {
+        renderProducts(sampleProducts);
+      }
+    }, 500);
   </script>
 </body>
 </html>
