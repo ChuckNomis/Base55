@@ -370,6 +370,78 @@
       height: 100%;
       border: none;
     }
+
+    /* --- Credentials Form (Step 4) --- */
+    .creds-form { margin: 1.5rem 0; }
+    .field-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+    .field-row input {
+      padding: 0.6rem 0.8rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field-row input:focus { border-color: var(--accent); }
+    .field-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+    .inline-error {
+      color: var(--danger);
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+
+    /* --- Generate + Result (Step 5) --- */
+    .summary-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+    .spinner-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 2rem 0;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .success-box {
+      margin: 2rem 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+      font-size: 1rem;
+    }
+    .success-box a.btn {
+      text-decoration: none;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
@@ -497,33 +569,77 @@
       </div>
     </div>
 
-    <!-- Step 4: Credentials (Plan 3c) -->
+    <!-- Step 4: Credentials -->
     <div id="step-4" class="step">
-      <!-- Plan 3c: credentials form -->
-      <h2 class="step-heading">Enter credentials</h2>
-      <p class="step-subheading">Provide the details needed to connect to your data source.</p>
-      <div class="placeholder-content">
-        <div class="placeholder-label">Coming in Plan 3c</div>
-        Credentials form — spec URL (OpenAPI) or store domain + token (Shopify)
+      <h2 id="creds-heading">Enter credentials</h2>
+      <p class="step-desc" id="creds-desc">Provide the details for your data source.</p>
+
+      <!-- OpenAPI fields (shown when source = openapi) -->
+      <div id="form-openapi" class="creds-form" style="display:none">
+        <label class="field-row">
+          <span>OpenAPI spec URL</span>
+          <input type="url" id="input-spec-url" placeholder="https://api.example.com/openapi.json"
+                 autocomplete="off" spellcheck="false">
+        </label>
+        <p class="field-hint">Must be publicly accessible. The generator fetches this URL server-side.</p>
       </div>
+
+      <!-- Shopify fields (shown when source = shopify) -->
+      <div id="form-shopify" class="creds-form" style="display:none">
+        <label class="field-row">
+          <span>Store domain</span>
+          <input type="text" id="input-store-domain" placeholder="your-store.myshopify.com"
+                 autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field-row" style="margin-top:1rem">
+          <span>Storefront access token</span>
+          <input type="password" id="input-storefront-token" placeholder="shpat_…"
+                 autocomplete="off" spellcheck="false">
+        </label>
+        <p class="field-hint">Find your token in Shopify admin → Apps → Develop apps → Storefront API.</p>
+      </div>
+
+      <div id="creds-error" class="inline-error" style="display:none"></div>
+
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="goBack()">Back</button>
         <button class="btn btn-primary" onclick="goNext()">Next</button>
       </div>
     </div>
 
-    <!-- Step 5: Generate + Result (Plan 3c) -->
+    <!-- Step 5: Generate + Result -->
     <div id="step-5" class="step">
-      <!-- Plan 3c: generate + result -->
-      <h2 class="step-heading">Generate your MCP server</h2>
-      <p class="step-subheading">Review your choices and generate the ready-to-deploy server.</p>
-      <div class="placeholder-content">
-        <div class="placeholder-label">Coming in Plan 3c</div>
-        Generate button, progress indicator, and download link
+      <h2>Generate your MCP server</h2>
+      <p class="step-desc">Review your choices below, then click Generate.</p>
+
+      <div id="summary-box" class="summary-box"></div>
+
+      <!-- Idle state -->
+      <div id="generate-idle">
+        <div id="generate-error" class="inline-error" style="display:none"></div>
+        <div class="nav-row">
+          <button class="btn btn-secondary" onclick="goBack()">Back</button>
+          <button class="btn btn-primary" id="btn-generate" onclick="startGenerate()">Generate</button>
+        </div>
       </div>
-      <div class="nav-row">
-        <button class="btn btn-secondary" onclick="goBack()">Back</button>
-        <button class="btn btn-primary" disabled>Generate</button>
+
+      <!-- Loading state -->
+      <div id="generate-loading" style="display:none">
+        <div class="spinner-row">
+          <div class="spinner"></div>
+          <span>Generating your MCP server… this may take up to 30 seconds.</span>
+        </div>
+      </div>
+
+      <!-- Success state -->
+      <div id="generate-success" style="display:none">
+        <div class="success-box">
+          <p>Your MCP server is ready!</p>
+          <a id="download-link" class="btn btn-primary" download="server.zip">&#x2B07; Download server.zip</a>
+        </div>
+        <div class="nav-row" style="margin-top:1rem">
+          <button class="btn btn-secondary" onclick="resetWizard()">Start over</button>
+        </div>
       </div>
     </div>
 
@@ -602,6 +718,16 @@
       if (n === 3) {
         updateColorPreview();
       }
+
+      // Show correct credentials form when entering step 4
+      if (n === 4) {
+        showCredsForm();
+      }
+
+      // Build summary when entering step 5
+      if (n === 5) {
+        buildSummary();
+      }
     }
 
     /**
@@ -614,7 +740,35 @@
       if (n === 2) {
         return state.template !== null;
       }
-      // Steps 3–4: always valid (Plan 3c will add credentials validation)
+      if (n === 4) {
+        return validateStep4();
+      }
+      // Steps 3 and 5: always valid at this point
+      return true;
+    }
+
+    function showError(el, msg) {
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    function validateStep4() {
+      var errEl = document.getElementById('creds-error');
+      if (!errEl) return true;
+      if (state.source === 'openapi') {
+        var url = document.getElementById('input-spec-url').value.trim();
+        if (!url) { showError(errEl, 'Please enter an OpenAPI spec URL.'); return false; }
+        try { new URL(url); } catch (e) { showError(errEl, 'Please enter a valid URL.'); return false; }
+        state.credentials.specUrl = url;
+      } else {
+        var domain = document.getElementById('input-store-domain').value.trim();
+        var token = document.getElementById('input-storefront-token').value.trim();
+        if (!domain) { showError(errEl, 'Please enter your store domain.'); return false; }
+        if (!token) { showError(errEl, 'Please enter your storefront access token.'); return false; }
+        state.credentials.storeDomain = domain;
+        state.credentials.storefrontToken = token;
+      }
+      errEl.style.display = 'none';
       return true;
     }
 
@@ -728,6 +882,89 @@
       state.colors.bg = e.target.value;
       applyColorsToIframe(document.getElementById('color-preview-iframe'));
     });
+
+    // ---- Step 4: Credentials form show/hide + restore ----
+    function showCredsForm() {
+      document.getElementById('form-openapi').style.display = state.source === 'openapi' ? 'block' : 'none';
+      document.getElementById('form-shopify').style.display = state.source === 'shopify' ? 'block' : 'none';
+      // Restore previously entered values
+      if (state.source === 'openapi' && state.credentials.specUrl) {
+        document.getElementById('input-spec-url').value = state.credentials.specUrl;
+      }
+      if (state.source === 'shopify') {
+        if (state.credentials.storeDomain) document.getElementById('input-store-domain').value = state.credentials.storeDomain;
+        if (state.credentials.storefrontToken) document.getElementById('input-storefront-token').value = state.credentials.storefrontToken;
+      }
+      document.getElementById('creds-error').style.display = 'none';
+    }
+
+    // ---- Step 5: Summary + Generate + Reset ----
+    function buildSummary() {
+      var templateNames = {
+        'carousel': 'Dark Carousel',
+        'carousel-light': 'Light Carousel',
+        'grid-dark': 'Dark Grid',
+      };
+      var lines = [
+        '<strong>Source:</strong> ' + (state.source === 'openapi' ? 'OpenAPI' : 'Shopify'),
+        '<strong>Template:</strong> ' + (templateNames[state.template] || state.template),
+        '<strong>Colors:</strong> Primary ' + state.colors.primary + ' / Accent ' + state.colors.accent + ' / BG ' + state.colors.bg,
+      ];
+      if (state.source === 'openapi') {
+        lines.push('<strong>Spec URL:</strong> ' + state.credentials.specUrl);
+      } else {
+        lines.push('<strong>Store domain:</strong> ' + state.credentials.storeDomain);
+      }
+      document.getElementById('summary-box').innerHTML = lines.join('<br>');
+    }
+
+    async function startGenerate() {
+      var errEl = document.getElementById('generate-error');
+      errEl.style.display = 'none';
+      document.getElementById('generate-idle').style.display = 'none';
+      document.getElementById('generate-loading').style.display = 'block';
+
+      var endpoint = state.source === 'openapi'
+        ? BACKEND_URL + '/generate/openapi'
+        : BACKEND_URL + '/generate/shopify';
+
+      var body = state.source === 'openapi'
+        ? { specUrl: state.credentials.specUrl, template: state.template,
+            primaryColor: state.colors.primary, accentColor: state.colors.accent, bgColor: state.colors.bg }
+        : { storeDomain: state.credentials.storeDomain, storefrontToken: state.credentials.storefrontToken,
+            template: state.template, primaryColor: state.colors.primary, accentColor: state.colors.accent, bgColor: state.colors.bg };
+
+      try {
+        var res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          var msg = await res.text().catch(function() { return 'HTTP ' + res.status; });
+          throw new Error(msg || 'Server error ' + res.status);
+        }
+        var blob = await res.blob();
+        var url = URL.createObjectURL(blob);
+        document.getElementById('download-link').href = url;
+        document.getElementById('generate-loading').style.display = 'none';
+        document.getElementById('generate-success').style.display = 'block';
+      } catch (err) {
+        document.getElementById('generate-loading').style.display = 'none';
+        document.getElementById('generate-idle').style.display = 'block';
+        showError(errEl, 'Generation failed: ' + err.message + '. Is the backend running at ' + BACKEND_URL + '?');
+      }
+    }
+
+    function resetWizard() {
+      state.source = null;
+      state.template = null;
+      state.colors = { primary: '#3b82f6', accent: '#4ade80', bg: '#0f0f0f' };
+      state.credentials = {};
+      document.getElementById('generate-success').style.display = 'none';
+      document.getElementById('generate-idle').style.display = 'block';
+      showStep(1);
+    }
 
     // Keyboard accessibility for source cards
     document.querySelectorAll('.source-card').forEach(function(card) {
