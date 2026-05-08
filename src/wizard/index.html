@@ -269,6 +269,107 @@
       margin-bottom: 0.5rem;
       color: var(--border);
     }
+
+    /* --- Template Gallery (Step 2) --- */
+    .template-gallery {
+      display: flex;
+      gap: 1rem;
+      margin: 1.5rem 0;
+      flex-wrap: wrap;
+    }
+
+    .template-card {
+      flex: 1;
+      min-width: 220px;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .template-card.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+    }
+
+    .iframe-wrapper {
+      width: 100%;
+      height: 200px;
+      overflow: hidden;
+      pointer-events: none;
+      background: #111;
+    }
+
+    .iframe-wrapper iframe {
+      width: 300%;
+      height: 300%;
+      transform: scale(0.333);
+      transform-origin: top left;
+      border: none;
+    }
+
+    .template-label {
+      padding: 0.6rem 1rem;
+      font-size: 0.875rem;
+      color: var(--text);
+      background: var(--surface);
+      text-align: center;
+    }
+
+    /* --- Color Customization (Step 3) --- */
+    .color-layout {
+      display: flex;
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+      align-items: flex-start;
+    }
+
+    .color-pickers {
+      flex: 0 0 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .color-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .color-row input[type="color"] {
+      width: 44px;
+      height: 32px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: none;
+    }
+
+    .color-hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    .color-preview-wrap {
+      flex: 1;
+      height: 280px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #111;
+    }
+
+    .color-preview-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
   </style>
 </head>
 <body>
@@ -336,29 +437,59 @@
       </div>
     </div>
 
-    <!-- Step 2: Template Picker (Plan 3b) -->
+    <!-- Step 2: Template Picker -->
     <div id="step-2" class="step">
-      <!-- Plan 3b: template picker -->
-      <h2 class="step-heading">Pick a template</h2>
-      <p class="step-subheading">Choose how your products will look inside Claude.</p>
-      <div class="placeholder-content">
-        <div class="placeholder-label">Coming in Plan 3b</div>
-        Template picker — choose from available UI templates
+      <h2>Choose a template</h2>
+      <p class="step-desc">Select the layout for your product display.</p>
+      <div class="template-gallery">
+        <div class="template-card" data-template="carousel" data-src="../../templates/ui/carousel.html">
+          <div class="iframe-wrapper">
+            <iframe src="../../templates/ui/carousel.html" scrolling="no" tabindex="-1"></iframe>
+          </div>
+          <div class="template-label">Dark Carousel</div>
+        </div>
+        <div class="template-card" data-template="carousel-light" data-src="../../templates/ui/carousel-light.html">
+          <div class="iframe-wrapper">
+            <iframe src="../../templates/ui/carousel-light.html" scrolling="no" tabindex="-1"></iframe>
+          </div>
+          <div class="template-label">Light Carousel</div>
+        </div>
+        <div class="template-card" data-template="grid-dark" data-src="../../templates/ui/grid-dark.html">
+          <div class="iframe-wrapper">
+            <iframe src="../../templates/ui/grid-dark.html" scrolling="no" tabindex="-1"></iframe>
+          </div>
+          <div class="template-label">Dark Grid</div>
+        </div>
       </div>
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="goBack()">Back</button>
-        <button class="btn btn-primary" onclick="goNext()">Next</button>
+        <button class="btn btn-primary" id="next-2" onclick="goNext()" disabled>Next</button>
       </div>
     </div>
 
-    <!-- Step 3: Color Customization (Plan 3b) -->
+    <!-- Step 3: Color Customization -->
     <div id="step-3" class="step">
-      <!-- Plan 3b: color customization -->
-      <h2 class="step-heading">Customize colors</h2>
-      <p class="step-subheading">Adjust the look of your storefront UI.</p>
-      <div class="placeholder-content">
-        <div class="placeholder-label">Coming in Plan 3b</div>
-        Color customization — primary, accent, and background colors
+      <h2>Customize colors</h2>
+      <p class="step-desc">Adjust the color palette for your selected template.</p>
+      <div class="color-layout">
+        <div class="color-pickers">
+          <label class="color-row">
+            <span>Primary color</span>
+            <input type="color" id="color-primary" value="#3b82f6">
+          </label>
+          <label class="color-row">
+            <span>Accent color</span>
+            <input type="color" id="color-accent" value="#4ade80">
+          </label>
+          <label class="color-row">
+            <span>Background</span>
+            <input type="color" id="color-bg" value="#0f0f0f">
+          </label>
+          <p class="color-hint">These colors are injected into your chosen template at generation time.</p>
+        </div>
+        <div class="color-preview-wrap">
+          <iframe id="color-preview-iframe" scrolling="no"></iframe>
+        </div>
       </div>
       <div class="nav-row">
         <button class="btn btn-secondary" onclick="goBack()">Back</button>
@@ -466,6 +597,11 @@
         var err = document.getElementById('step-1-error');
         if (err) err.textContent = '';
       }
+
+      // Trigger color preview when entering step 3
+      if (n === 3) {
+        updateColorPreview();
+      }
     }
 
     /**
@@ -475,7 +611,10 @@
       if (n === 1) {
         return state.source !== null;
       }
-      // Steps 2–4: always valid for now (Plan 3b/3c will add real validation)
+      if (n === 2) {
+        return state.template !== null;
+      }
+      // Steps 3–4: always valid (Plan 3c will add credentials validation)
       return true;
     }
 
@@ -531,6 +670,64 @@
       var err = document.getElementById('step-1-error');
       if (err) err.textContent = '';
     }
+
+    // ---- Step 2: Template selection ----
+    document.querySelectorAll('.template-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        document.querySelectorAll('.template-card').forEach(function(c) {
+          c.classList.remove('selected');
+        });
+        card.classList.add('selected');
+        state.template = card.dataset.template;
+        document.getElementById('next-2').disabled = false;
+      });
+    });
+
+    // ---- Step 3: Color preview ----
+    var TEMPLATE_PATHS = {
+      'carousel':       '../../templates/ui/carousel.html',
+      'carousel-light': '../../templates/ui/carousel-light.html',
+      'grid-dark':      '../../templates/ui/grid-dark.html',
+    };
+
+    function updateColorPreview() {
+      var iframe = document.getElementById('color-preview-iframe');
+      if (!iframe) return;
+      var path = TEMPLATE_PATHS[state.template] || TEMPLATE_PATHS['carousel'];
+      var currentSrc = iframe.getAttribute('src') || '';
+      var pathTail = path.replace('../../', '');
+      if (!currentSrc.endsWith(pathTail)) {
+        iframe.src = path;
+        iframe.onload = function() { applyColorsToIframe(iframe); };
+      } else {
+        applyColorsToIframe(iframe);
+      }
+    }
+
+    function applyColorsToIframe(iframe) {
+      try {
+        var root = iframe.contentDocument && iframe.contentDocument.documentElement;
+        if (!root) return;
+        root.style.setProperty('--primary-color', state.colors.primary);
+        root.style.setProperty('--accent-color', state.colors.accent);
+        root.style.setProperty('--bg-color', state.colors.bg);
+      } catch (e) {
+        // cross-origin guard — no-op if file:// restriction kicks in
+      }
+    }
+
+    document.getElementById('color-primary').addEventListener('input', function(e) {
+      state.colors.primary = e.target.value;
+      applyColorsToIframe(document.getElementById('color-preview-iframe'));
+    });
+    document.getElementById('color-accent').addEventListener('input', function(e) {
+      state.colors.accent = e.target.value;
+      applyColorsToIframe(document.getElementById('color-preview-iframe'));
+    });
+    document.getElementById('color-bg').addEventListener('input', function(e) {
+      state.colors.bg = e.target.value;
+      applyColorsToIframe(document.getElementById('color-preview-iframe'));
+    });
 
     // Keyboard accessibility for source cards
     document.querySelectorAll('.source-card').forEach(function(card) {
