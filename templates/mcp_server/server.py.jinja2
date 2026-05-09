@@ -1,0 +1,46 @@
+"""
+Auto-generated MCP server by Base55.
+Run:  pip install -r requirements.txt && python server.py
+"""
+import json
+import httpx
+from fastmcp import FastMCP
+from fastmcp.apps import AppConfig
+
+mcp = FastMCP("Generated Commerce MCP", version="1.0.0")
+BASE_URL = "{{ base_url }}"
+
+# Read carousel HTML at startup (lives next to server.py in the unzipped folder)
+with open("{{ template_name }}.html", "r", encoding="utf-8") as _f:
+    _CAROUSEL_HTML = _f.read()
+
+# ── Generated tool functions ─────────────────────────────────────────────────
+
+{% for tool in tools %}
+# Tool: {{ tool.name }}
+{{ tool.code }}
+
+{% endfor %}
+# ── UI Resource ───────────────────────────────────────────────────────────────
+
+@mcp.resource(
+    "ui://products/carousel",
+    mime_type="text/html;profile=mcp-app",
+)
+def carousel_ui() -> str:
+    return _CAROUSEL_HTML
+
+# ── Tool Registrations ────────────────────────────────────────────────────────
+
+{% for tool in tools %}
+@mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
+async def {{ tool.name }}_tool(query: str) -> str:
+    """{{ tool.description }}"""
+    result = await {{ tool.name }}(query)
+    return json.dumps(result)
+
+{% endfor %}
+# ── Server Start ──────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    mcp.run()
