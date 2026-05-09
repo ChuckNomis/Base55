@@ -18,8 +18,11 @@ SHOPIFY_STOREFRONT_TOKEN = "{{ storefront_token }}"
 SHOPIFY_API_VERSION = "2025-01"
 SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/api/{SHOPIFY_API_VERSION}/graphql.json"
 
-# Read carousel HTML at startup (lives next to server.py in the unzipped folder)
-with open("{{ template_name }}.html", "r", encoding="utf-8") as _f:
+# Read carousel HTML at startup (relative to this script's directory so it works
+# regardless of which directory Claude launches "python server.py" from)
+import os as _os
+_HERE = _os.path.dirname(_os.path.abspath(__file__))
+with open(_os.path.join(_HERE, "{{ template_name }}.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
 PRODUCTS_QUERY = """
