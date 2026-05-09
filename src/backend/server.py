@@ -17,12 +17,14 @@ try:
 except Exception:
     pass
 
+import re
+
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from jinja2 import Environment, FileSystemLoader
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from src.openapi.generator.core import make_all_tools
 
@@ -61,13 +63,40 @@ class ShopifyRequest(BaseModel):
     accentColor: str
     bgColor: str
 
+    @field_validator("storefrontToken", "storeDomain")
+    @classmethod
+    def no_template_injection(cls, v: str) -> str:
+        if any(c in v for c in ("{", "}", "\n", "\r")):
+            raise ValueError("Invalid characters in credential field")
+        return v
+
+    @field_validator("storeDomain")
+    @classmethod
+    def must_be_myshopify(cls, v: str) -> str:
+        if not v.endswith(".myshopify.com"):
+            raise ValueError("storeDomain must end with .myshopify.com")
+        return v
+
+_CSS_COLOR_RE = re.compile(
+    r'^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$'   # hex shorthand or full
+    r'|^rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)$'
+)
+
+def _validate_color(value: str, field: str) -> str:
+    if not _CSS_COLOR_RE.match(value):
+        raise HTTPException(status_code=422, detail=f"Invalid CSS color for {field}: {value!r}")
+    return value
+
 def inject_colors(html: str, primary: str, accent: str, bg: str) -> str:
     """Prepend a <style>:root{...}</style> block right after the first <head> tag."""
     style_block = (
         f"<style>:root{{--primary-color:{primary};"
         f"--accent-color:{accent};--bg-color:{bg};}}</style>"
     )
-    return html.replace("<head>", "<head>" + style_block, 1)
+    result = html.replace("<head>", "<head>" + style_block, 1)
+    if result == html:
+        raise ValueError("inject_colors: no <head> tag found in HTML template")
+    return result
 
 def build_zip(files: dict[str, str]) -> bytes:
     """Build an in-memory zip from a {filename: content} mapping."""
@@ -121,7 +150,11 @@ async def generate_openapi(body: OpenAPIRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load tool template: {e}")
 
-    loop = asyncio.get_event_loop()
+    _validate_color(body.primaryColor, "primaryColor")
+    _validate_color(body.accentColor, "accentColor")
+    _validate_color(body.bgColor, "bgColor")
+
+    loop = asyncio.get_running_loop()
     try:
         manifest = await loop.run_in_executor(None, make_all_tools, openapi_spec, tool_template)
     except Exception as e:
@@ -149,16 +182,21 @@ async def generate_openapi(body: OpenAPIRequest):
 
 @app.post("/generate/shopify")
 async def generate_shopify(body: ShopifyRequest):
-    # 1. Validate template name + load HTML (raises 400 on bad template)
+    # 1. Validate color values before any processing
+    _validate_color(body.primaryColor, "primaryColor")
+    _validate_color(body.accentColor, "accentColor")
+    _validate_color(body.bgColor, "bgColor")
+
+    # 2. Validate template name + load HTML (raises 400 on bad template)
     raw_html = load_ui_template(body.template)
 
-    # 2. Render server.py — no GPT call, no spec fetch needed
+    # 3. Render server.py — no GPT call, no spec fetch needed
     server_py = render_shopify_server(body.storeDomain, body.storefrontToken, body.template)
 
-    # 3. Color-inject the chosen UI template
+    # 4. Color-inject the chosen UI template
     injected_html = inject_colors(raw_html, body.primaryColor, body.accentColor, body.bgColor)
 
-    # 4. Build zip and return
+    # 5. Build zip and return
     zip_bytes = build_zip({
         "server.py": server_py,
         "requirements.txt": GENERATED_REQUIREMENTS,
