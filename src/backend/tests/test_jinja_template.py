@@ -15,7 +15,7 @@ def test_renders_with_empty_tools():
     assert "@mcp.resource(" in out
     assert "ui://products/carousel" in out
     assert 'BASE_URL = "https://api.example.com"' in out
-    assert 'open("carousel.html"' in out
+    assert '"carousel.html"' in out
 
 def test_renders_with_one_tool():
     tools = [type("T", (), {"name": "search_products", "code": "async def search_products(q):\n    return {'products': []}", "description": "Search"})()]

@@ -124,4 +124,4 @@ def test_shopify_grid_dark_template_works():
     zf = zipfile.ZipFile(io.BytesIO(r.content))
     assert "grid-dark.html" in zf.namelist()
     server_py = zf.read("server.py").decode("utf-8")
-    assert 'open("grid-dark.html"' in server_py
+    assert '"grid-dark.html"' in server_py

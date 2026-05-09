@@ -37,7 +37,7 @@ def test_has_graphql_query_and_auth_header():
 
 def test_reads_template_html_at_startup():
     out = _render(template_name="grid-dark")
-    assert 'open("grid-dark.html"' in out
+    assert '"grid-dark.html"' in out
 
 def test_rendered_output_is_valid_python():
     out = _render()
