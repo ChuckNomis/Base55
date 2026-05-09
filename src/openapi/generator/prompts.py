@@ -12,7 +12,7 @@ def build_user_prompt(template: dict, openapi_spec: dict, base_url: str) -> str:
     return (
         f"OpenAPI Spec:\n{spec_text}\n\n"
         f"Base URL (from spec servers[0].url): {base_url}\n\n"
-        f"Generate the `{tool['name']}(query: string)` function.\n"
+        f"Generate the `{tool['name']}(query: str)` function.\n"
         f"Hardcode `{base_url}` directly as the base URL inside the function.\n\n"
         f"Tool description: {tool['description']}\n"
         f"Required output schema: {json.dumps(tool['output_schema'], indent=2)}"
