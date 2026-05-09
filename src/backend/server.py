@@ -93,9 +93,9 @@ def inject_colors(html: str, primary: str, accent: str, bg: str) -> str:
         f"<style>:root{{--primary-color:{primary};"
         f"--accent-color:{accent};--bg-color:{bg};}}</style>"
     )
-    result = html.replace("<head>", "<head>" + style_block, 1)
+    result = html.replace("</head>", style_block + "</head>", 1)
     if result == html:
-        raise ValueError("inject_colors: no <head> tag found in HTML template")
+        raise ValueError("inject_colors: no </head> tag found in HTML template")
     return result
 
 def build_zip(files: dict[str, str]) -> bytes:
