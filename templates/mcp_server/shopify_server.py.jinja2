@@ -67,7 +67,7 @@ async def search_products(query: str) -> dict:
             timeout=15,
         )
         resp.raise_for_status()
-    data = resp.json()
+        data = resp.json()
     if data.get("errors"):
         raise RuntimeError(f"Shopify GraphQL error: {data['errors'][0].get('message', 'unknown')}")
     edges = data.get("data", {}).get("products", {}).get("edges", [])
