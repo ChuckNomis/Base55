@@ -40,6 +40,7 @@ def test_openapi_unknown_template_returns_400():
     assert "Unknown template" in r.json()["detail"]
 
 def test_openapi_happy_path_returns_zip():
+    # Integration test: requires templates/ui/carousel.html to be present on disk
     with patch("src.backend.server.httpx.AsyncClient") as mock_client, \
          patch("src.backend.server.make_all_tools", return_value=FAKE_MANIFEST):
         mock_resp = MagicMock(); mock_resp.json.return_value = FAKE_SPEC; mock_resp.raise_for_status = MagicMock()
@@ -50,7 +51,8 @@ def test_openapi_happy_path_returns_zip():
     assert "filename=server.zip" in r.headers["content-disposition"]
     zf = zipfile.ZipFile(io.BytesIO(r.content))
     names = set(zf.namelist())
-    assert names == {"server.py", "requirements.txt", "carousel.html"}
+    expected_html_name = f"{VALID_BODY['template']}.html"
+    assert names == {"server.py", "requirements.txt", expected_html_name}
     server_py = zf.read("server.py").decode("utf-8")
     assert "from fastmcp import FastMCP" in server_py
     assert "search_products" in server_py
