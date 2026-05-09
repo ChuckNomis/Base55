@@ -1,0 +1,143 @@
+"""
+Base55 Generator Backend.
+
+Runs at http://localhost:3001 by default.
+POST /generate/openapi  → returns a zip of a Python/FastMCP MCP server
+POST /generate/shopify  → (implemented in plan 02)
+"""
+import asyncio
+import io
+import json
+import zipfile
+from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+import httpx
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from jinja2 import Environment, FileSystemLoader
+from pydantic import BaseModel
+
+from src.openapi.generator.core import make_all_tools
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+TEMPLATES_DIR = REPO_ROOT / "templates"
+UI_DIR = TEMPLATES_DIR / "ui"
+MCP_TEMPLATE_DIR = TEMPLATES_DIR / "mcp_server"
+ALLOWED_TEMPLATES = {"carousel", "carousel-light", "grid-dark"}
+
+GENERATED_REQUIREMENTS = (
+    "fastmcp>=3.2.4\n"
+    "httpx>=0.27.0\n"
+)
+
+app = FastAPI(title="Base55 Generator Backend", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class OpenAPIRequest(BaseModel):
+    specUrl: str
+    template: str
+    primaryColor: str
+    accentColor: str
+    bgColor: str
+
+class ShopifyRequest(BaseModel):
+    storeDomain: str
+    storefrontToken: str
+    template: str
+    primaryColor: str
+    accentColor: str
+    bgColor: str
+
+def inject_colors(html: str, primary: str, accent: str, bg: str) -> str:
+    """Prepend a <style>:root{...}</style> block right after the first <head> tag."""
+    style_block = (
+        f"<style>:root{{--primary-color:{primary};"
+        f"--accent-color:{accent};--bg-color:{bg};}}</style>"
+    )
+    return html.replace("<head>", "<head>" + style_block, 1)
+
+def build_zip(files: dict[str, str]) -> bytes:
+    """Build an in-memory zip from a {filename: content} mapping."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, content in files.items():
+            zf.writestr(name, content)
+    buf.seek(0)
+    return buf.getvalue()
+
+def load_ui_template(template_name: str) -> str:
+    """Read templates/ui/{template_name}.html or raise 400."""
+    if template_name not in ALLOWED_TEMPLATES:
+        raise HTTPException(status_code=400, detail=f"Unknown template: {template_name}")
+    path = UI_DIR / f"{template_name}.html"
+    if not path.exists():
+        raise HTTPException(status_code=400, detail=f"Template file missing: {path.name}")
+    return path.read_text(encoding="utf-8")
+
+def render_openapi_server(tools: list, base_url: str, template_name: str) -> str:
+    env = Environment(loader=FileSystemLoader(str(MCP_TEMPLATE_DIR)), autoescape=False)
+    tmpl = env.get_template("server.py.jinja2")
+    return tmpl.render(tools=tools, base_url=base_url, template_name=template_name)
+
+@app.get("/healthz")
+def healthz():
+    return {"status": "ok"}
+
+@app.post("/generate/openapi")
+async def generate_openapi(body: OpenAPIRequest):
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(body.specUrl, timeout=15)
+            resp.raise_for_status()
+            openapi_spec = resp.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch OpenAPI spec: {e}")
+
+    template_path = TEMPLATES_DIR / "products.json"
+    try:
+        tool_template = json.loads(template_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load tool template: {e}")
+
+    loop = asyncio.get_event_loop()
+    try:
+        manifest = await loop.run_in_executor(None, make_all_tools, openapi_spec, tool_template)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+
+    base_url = ""
+    servers = openapi_spec.get("servers", [])
+    if servers and isinstance(servers[0], dict):
+        base_url = servers[0].get("url", "") or ""
+    server_py = render_openapi_server(manifest.tools, base_url, body.template)
+
+    raw_html = load_ui_template(body.template)
+    injected_html = inject_colors(raw_html, body.primaryColor, body.accentColor, body.bgColor)
+
+    zip_bytes = build_zip({
+        "server.py": server_py,
+        "requirements.txt": GENERATED_REQUIREMENTS,
+        f"{body.template}.html": injected_html,
+    })
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=server.zip"},
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=3001)
