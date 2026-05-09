@@ -1,161 +1,148 @@
 # Base55
 
-Base55 generates ready-to-deploy MCP (Model Context Protocol) servers with visual product carousel UI. Give it an OpenAPI spec or a Shopify store and it produces a working MCP server you can connect to Claude or any MCP-compatible host.
+Base55 generates ready-to-deploy MCP (Model Context Protocol) servers with a visual product carousel UI. Open the web wizard, choose an OpenAPI spec or Shopify store, pick a color theme, and download a working Python MCP server you can connect to Claude.
 
 **Two integration paths:**
-- **OpenAPI path** — Provide any OpenAPI spec URL. GPT-4o generates TypeScript tool functions; a Handlebars assembler packages them into a complete MCP server.
-- **Shopify path** — Pre-built MCP server that connects to the Shopify Storefront API. Configure your store credentials and run.
+- **OpenAPI** — Provide any OpenAPI spec URL. GPT-4o generates Python tool functions; the backend assembles them into a complete MCP server.
+- **Shopify** — Pre-built MCP server. Enter your store domain and Storefront token; the wizard produces a configured server instantly (no GPT call).
 
 ---
 
 ## Prerequisites
 
 - Python 3.11+
-- Node.js 18+
-- An OpenAI API key (for the OpenAPI path only)
+- An OpenAI API key (OpenAPI path only)
 
 ---
 
-## Setup
+## Quick Start
+
+### 1. Install backend dependencies
 
 ```bash
-# Python dependencies
-pip install -r src/openapi/generator/requirements.txt
-pip install -r demo_api/requirements.txt
-
-# Build the TypeScript assembler
-cd src/openapi/assembler && npm install && npm run build && cd ../../..
+pip install -r src/backend/requirements.txt
+pip install -r demo_api/requirements.txt   # optional — only needed for local OpenAPI demo
 ```
 
----
-
-## Running the OpenAPI Pipeline
-
-The OpenAPI path takes any OpenAPI spec and generates a complete MCP server.
-
-### 1. Start the demo commerce API
-
-A local FastAPI server is included as an example OpenAPI source:
-
-```bash
-uvicorn demo_api.main:app --host 127.0.0.1 --port 8001
-```
-
-OpenAPI spec is served at `http://127.0.0.1:8001/openapi.json`
-
-### 2. Generate the MCP server
+### 2. Set your OpenAI API key (OpenAPI path only)
 
 ```bash
 export OPENAI_API_KEY=sk-...
-
-python -m src.openapi.generator.generate \
-  --openapi http://127.0.0.1:8001/openapi.json \
-  --template templates/products.json \
-  --output-dir src/openapi/generated_server/
 ```
 
-This calls GPT-4o to write the tool functions, then assembles them into `src/openapi/generated_server/`.
-
-You can also point `--openapi` at any publicly accessible OpenAPI JSON URL.
-
-### 3. Run the generated server
+### 3. Start the backend
 
 ```bash
-cd src/openapi/generated_server && npm install && npm start
+uvicorn src.backend.server:app --port 3001
 ```
 
-### 4. Connect to Claude (optional)
+The backend runs at `http://localhost:3001`.
 
-Add to your Claude MCP config:
+### 4. Open the wizard
+
+Open `src/wizard/index.html` in your browser (double-click the file or use a `file://` URL).
+
+The wizard talks to `http://localhost:3001` automatically.
+
+### 5. Generate your MCP server
+
+Follow the wizard steps:
+1. Choose **OpenAPI** or **Shopify**
+2. Pick a UI template (Dark Carousel, Light Carousel, or Dark Grid)
+3. Customize colors
+4. Enter credentials (spec URL for OpenAPI, or store domain + token for Shopify)
+5. Click **Generate** and download `server.zip`
+
+### 6. Run the generated server
+
+```bash
+unzip server.zip -d my-mcp-server
+cd my-mcp-server
+pip install -r requirements.txt
+python server.py
+```
+
+### 7. Connect to Claude
+
+Add to your `claude_desktop_config.json` (find it at `~/Library/Application Support/Claude/` on macOS or `%APPDATA%\Claude\` on Windows):
 
 ```json
 {
   "mcpServers": {
     "base55": {
-      "command": "npx",
-      "args": ["tsx", "index.ts"],
-      "cwd": "/path/to/src/openapi/generated_server"
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "/absolute/path/to/my-mcp-server"
     }
   }
 }
 ```
+
+Restart Claude Desktop. The MCP server appears in Claude's tool list.
 
 ---
 
-## Running the Shopify Demo
+## OpenAPI Path Details
 
-The Shopify path is a standalone MCP server that connects to the Shopify Storefront API.
+The OpenAPI path uses GPT-4o to generate Python tool functions from any OpenAPI spec.
 
-### 1. Configure credentials
+### Local demo API (optional)
 
-Create `src/shopify/.env`:
-
-```
-SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
-SHOPIFY_STOREFRONT_TOKEN=your-storefront-access-token
-```
-
-To get a Storefront Access Token: Shopify Admin → Apps → Develop apps → Create an app → Storefront API access → enable `unauthenticated_read_product_listings`.
-
-### 2. Install and run
+A FastAPI demo commerce API is included as a convenient OpenAPI source for testing:
 
 ```bash
-cd src/shopify && npm install && npx tsx index.ts
+uvicorn demo_api.main:app --host 127.0.0.1 --port 8001
 ```
 
-### 3. Connect to Claude (optional)
+OpenAPI spec: `http://127.0.0.1:8001/openapi.json`
 
-```json
-{
-  "mcpServers": {
-    "shopify": {
-      "command": "npx",
-      "args": ["tsx", "index.ts"],
-      "cwd": "/path/to/src/shopify"
-    }
-  }
-}
-```
+Use this URL in the wizard's spec URL field.
+
+---
+
+## Shopify Path Details
+
+No GPT call is made. The wizard takes your store domain and Storefront token and renders a Python MCP server directly.
+
+**To get a Storefront Access Token:** Shopify Admin → Apps → Develop apps → Create an app → Storefront API access → enable `unauthenticated_read_product_listings`.
+
+The generated `server.py` hardcodes your credentials. Keep the zip private.
 
 ---
 
 ## Architecture
 
 ```
-OpenAPI Pipeline
-────────────────
-OpenAPI spec (URL or file)
+Wizard (src/wizard/index.html)
         │
+        │  POST /generate/openapi or /generate/shopify
         ▼
-  src/openapi/generator/   ← Python; calls GPT-4o
-  (generate.py, core.py,
-   llm.py, prompts.py)
+Backend (src/backend/server.py, port 3001)
         │
-        │  tools_manifest.json
+        ├── OpenAPI path: fetch spec → GPT-4o → tool functions → Jinja2 render
+        └── Shopify path: Jinja2 render (no GPT)
+        │
+        ▼  server.zip
+┌──────────────────────┐
+│ server.py            │  ← Python/FastMCP MCP server
+│ requirements.txt     │  ← fastmcp, httpx
+│ {template}.html      │  ← color-customized carousel UI
+└──────────────────────┘
+        │
+        │  python server.py  (stdio transport)
         ▼
-  src/openapi/assembler/   ← TypeScript; Handlebars render
-  (src/index.ts)
-        │
-        ├── index.ts        (MCP server with generated tools)
-        ├── carousel.html   (product carousel UI)
-        ├── package.json
-        └── tsconfig.json
-        │
-        ▼
-  src/openapi/generated_server/   ← ready to run
-
-
-Shopify Pipeline
-────────────────
-Shopify Storefront API
-        │
-        ▼
-  src/shopify/index.ts     ← TypeScript MCP server
-  (Storefront GraphQL)
-        │
-        ▼
-  carousel.html            ← product carousel UI
+Claude Desktop (MCP host)
 ```
+
+### UI Templates
+
+| Template | File | Description |
+|----------|------|-------------|
+| Dark Carousel | `templates/ui/carousel.html` | Dark-theme horizontal product scroll |
+| Light Carousel | `templates/ui/carousel-light.html` | Light-theme horizontal scroll |
+| Dark Grid | `templates/ui/grid-dark.html` | Dark compact 2-3 column grid |
+
+All templates use `--primary-color`, `--accent-color`, and `--bg-color` CSS variables.
 
 ---
 
@@ -163,27 +150,33 @@ Shopify Storefront API
 
 ```
 src/
+  backend/          Python FastAPI backend (generation endpoints)
+  wizard/           Web setup wizard (index.html — open in browser)
   openapi/
-    generator/      Python: GPT-4o tool generation
-    assembler/      TypeScript: Handlebars-based MCP server assembly
-    generated_server/  (git-ignored) pipeline output
-  shopify/          TypeScript: Shopify Storefront MCP server
-  wizard/           (coming in Phase 3) web setup wizard
+    generator/      Python: GPT-4o tool generation (used by backend)
+    assembler/      TypeScript: legacy Handlebars assembler (not used by wizard)
+  shopify/          TypeScript: standalone Shopify MCP server demo
 templates/
-  products.json           template definition (system prompt + tool specs)
-  mcp_server/server.hbs   Handlebars scaffold for generated server
-  ui/carousel.html        dark-theme product carousel UI
+  mcp_server/       Jinja2 templates for generated server.py files
+  ui/               HTML carousel and grid UI templates
+  products.json     Tool spec definition for the OpenAPI generator
 demo_api/           FastAPI demo commerce API (example OpenAPI source)
-docs/               project documents and meeting notes
+docs/               Project documents and meeting notes
 ```
 
 ---
 
 ## Debugging
 
-**MCP Inspector** — connect to any running MCP server:
+**MCP Inspector** — inspect any running MCP server:
+
 ```bash
 npx @modelcontextprotocol/inspector
 ```
 
-**VS Code** — `.vscode/mcp.json` is pre-configured to connect to `src/openapi/generated_server/` for local debugging.
+**Backend logs** — the `uvicorn` process prints request logs. Check here if generation fails.
+
+**Wizard error** — if generation fails, the wizard shows the backend error message in-line. Common causes:
+- Backend not running (`uvicorn src.backend.server:app --port 3001`)
+- Invalid spec URL (must be reachable from the backend process)
+- Missing `OPENAI_API_KEY` for the OpenAPI path
