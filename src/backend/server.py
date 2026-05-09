@@ -92,6 +92,15 @@ def render_openapi_server(tools: list, base_url: str, template_name: str) -> str
     tmpl = env.get_template("server.py.jinja2")
     return tmpl.render(tools=tools, base_url=base_url, template_name=template_name)
 
+def render_shopify_server(store_domain: str, storefront_token: str, template_name: str) -> str:
+    env = Environment(loader=FileSystemLoader(str(MCP_TEMPLATE_DIR)), autoescape=False)
+    tmpl = env.get_template("shopify_server.py.jinja2")
+    return tmpl.render(
+        store_domain=store_domain,
+        storefront_token=storefront_token,
+        template_name=template_name,
+    )
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
@@ -127,6 +136,29 @@ async def generate_openapi(body: OpenAPIRequest):
     raw_html = load_ui_template(body.template)
     injected_html = inject_colors(raw_html, body.primaryColor, body.accentColor, body.bgColor)
 
+    zip_bytes = build_zip({
+        "server.py": server_py,
+        "requirements.txt": GENERATED_REQUIREMENTS,
+        f"{body.template}.html": injected_html,
+    })
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=server.zip"},
+    )
+
+@app.post("/generate/shopify")
+async def generate_shopify(body: ShopifyRequest):
+    # 1. Validate template name + load HTML (raises 400 on bad template)
+    raw_html = load_ui_template(body.template)
+
+    # 2. Render server.py — no GPT call, no spec fetch needed
+    server_py = render_shopify_server(body.storeDomain, body.storefrontToken, body.template)
+
+    # 3. Color-inject the chosen UI template
+    injected_html = inject_colors(raw_html, body.primaryColor, body.accentColor, body.bgColor)
+
+    # 4. Build zip and return
     zip_bytes = build_zip({
         "server.py": server_py,
         "requirements.txt": GENERATED_REQUIREMENTS,

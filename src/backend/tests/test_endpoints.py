@@ -73,3 +73,55 @@ def test_cors_preflight_allowed():
     )
     assert r.status_code in (200, 204)
     assert r.headers.get("access-control-allow-origin") == "*"
+
+# ── Shopify endpoint tests (added in plan 02) ────────────────────────────────
+
+VALID_SHOPIFY_BODY = {
+    "storeDomain": "mystore.myshopify.com",
+    "storefrontToken": "shpat_test_abc",
+    "template": "carousel",
+    "primaryColor": "#FF6B00",
+    "accentColor": "#1A1A1A",
+    "bgColor": "#0F0F0F",
+}
+
+def test_shopify_missing_field_returns_422():
+    body = dict(VALID_SHOPIFY_BODY); del body["storefrontToken"]
+    assert client.post("/generate/shopify", json=body).status_code == 422
+
+def test_shopify_unknown_template_returns_400():
+    body = dict(VALID_SHOPIFY_BODY); body["template"] = "nonexistent"
+    r = client.post("/generate/shopify", json=body)
+    assert r.status_code == 400
+    assert "Unknown template" in r.json()["detail"]
+
+def test_shopify_happy_path_returns_zip_with_credentials_hardcoded():
+    r = client.post("/generate/shopify", json=VALID_SHOPIFY_BODY)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/zip"
+    assert "filename=server.zip" in r.headers["content-disposition"]
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    names = set(zf.namelist())
+    assert names == {"server.py", "requirements.txt", "carousel.html"}
+    server_py = zf.read("server.py").decode("utf-8")
+    # Credentials hardcoded in generated server.py
+    assert 'SHOPIFY_STORE_DOMAIN = "mystore.myshopify.com"' in server_py
+    assert 'SHOPIFY_STOREFRONT_TOKEN = "shpat_test_abc"' in server_py
+    # FastMCP scaffold present
+    assert "from fastmcp import FastMCP" in server_py
+    assert "products(first: $first, query: $query)" in server_py
+    # Color injection in HTML
+    html = zf.read("carousel.html").decode("utf-8")
+    assert "<style>:root{--primary-color:#FF6B00;" in html
+    # Requirements file
+    reqs = zf.read("requirements.txt").decode("utf-8")
+    assert "fastmcp>=" in reqs and "httpx>=" in reqs
+
+def test_shopify_grid_dark_template_works():
+    body = dict(VALID_SHOPIFY_BODY); body["template"] = "grid-dark"
+    r = client.post("/generate/shopify", json=body)
+    assert r.status_code == 200
+    zf = zipfile.ZipFile(io.BytesIO(r.content))
+    assert "grid-dark.html" in zf.namelist()
+    server_py = zf.read("server.py").decode("utf-8")
+    assert 'open("grid-dark.html"' in server_py
