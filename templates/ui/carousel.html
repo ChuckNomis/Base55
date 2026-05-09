@@ -13,93 +13,120 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg-color);
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
-      height: 100vh;
+      height: 380px;
       display: flex;
       align-items: center;
     }
     .carousel {
       display: flex;
-      gap: 12px;
+      gap: 16px;
       overflow-x: auto;
       overflow-y: hidden;
-      padding: 12px;
+      padding: 20px;
       width: 100%;
       height: 100%;
       scrollbar-width: thin;
-      scrollbar-color: #444 var(--bg-color);
+      scrollbar-color: #333 transparent;
+      align-items: center;
     }
+    .carousel::-webkit-scrollbar { height: 4px; }
+    .carousel::-webkit-scrollbar-track { background: transparent; }
+    .carousel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
     .card {
-      flex: 0 0 160px;
-      background: #1e1e1e;
-      border: 1px solid #333;
-      border-radius: 10px;
-      padding: 10px;
+      flex: 0 0 220px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      height: 320px;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: #3a3a3a;
     }
     .card-img {
-      height: 100px;
-      background: #2a2a2a;
-      border-radius: 6px;
-      border: 1px dashed #555;
+      width: 100%;
+      height: 160px;
+      background: #222;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      flex-shrink: 0;
     }
     .card-img img {
       width: 100%;
       height: 100%;
       object-fit: cover;
-      border-radius: 6px;
     }
     .card-img .placeholder {
-      color: #777;
-      font-size: 10px;
-    }
-    .card-body {
-      color: #e0e0e0;
-      flex-grow: 1;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      align-items: center;
+      gap: 6px;
+      color: #444;
+    }
+    .card-img .placeholder svg { opacity: 0.5; }
+    .card-img .placeholder span { font-size: 11px; }
+    .card-body {
+      padding: 14px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-height: 0;
     }
     .card-title {
+      color: #f0f0f0;
       font-weight: 600;
-      font-size: 13px;
-      line-height: 1.2;
+      font-size: 14px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .card-price {
       color: var(--accent-color);
-      font-size: 12px;
-      font-weight: bold;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
     .card-desc {
-      color: #999;
-      font-size: 10px;
-      line-height: 1.3;
+      color: #777;
+      font-size: 12px;
+      line-height: 1.5;
+      flex: 1;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .card-btn {
+      display: block;
+      text-align: center;
       width: 100%;
-      padding: 6px;
+      padding: 9px;
       background: var(--primary-color);
       color: white;
       border: none;
-      border-radius: 4px;
-      font-weight: bold;
+      border-radius: 8px;
+      font-weight: 600;
       cursor: pointer;
-      font-size: 11px;
+      font-size: 13px;
       text-decoration: none;
-      display: block;
-      text-align: center;
+      transition: background 0.15s ease;
+      margin-top: auto;
     }
-    .card-btn:hover { opacity: 0.85; }
+    .card-btn:hover { background: #2563eb; }
     .status {
       color: #555;
-      font-size: 13px;
+      font-size: 14px;
       padding: 20px;
       text-align: center;
       width: 100%;
@@ -112,19 +139,15 @@
   </div>
 
   <script>
-    // CR-01: Validate link URLs — only allow http: and https: schemes
     function safeHref(url) {
       if (!url) return '#';
       try {
         var parsed = new URL(url);
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-          return url;
-        }
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return url;
       } catch (e) {}
       return '#';
     }
 
-    // WR-02: Escape values used in HTML attribute positions
     function escapeAttr(str) {
       return (str || '').replace(/&/g, '&amp;')
                         .replace(/"/g, '&quot;')
@@ -133,29 +156,36 @@
                         .replace(/>/g, '&gt;');
     }
 
-    // WR-03: fallbackFired guard — set before fallbackTimer so renderProducts
-    // clears the timer even if called before the timeout fires
+    var placeholderSvg = '<div class="placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>No Image</span></div>';
+
     var fallbackFired = false;
     var fallbackTimer = null;
 
+    function notifySizeToHost() {
+      var target = trustedOrigin || parentOrigin;
+      if (!target || target === '*') return;
+      window.parent.postMessage({
+        jsonrpc: '2.0',
+        method: 'ui/notifications/size-changed',
+        params: { width: document.documentElement.offsetWidth, height: document.documentElement.offsetHeight }
+      }, target);
+    }
+
     function renderProducts(products) {
-      // WR-03: cancel fallback timer and prevent double-render
       fallbackFired = true;
       clearTimeout(fallbackTimer);
 
-      const carousel = document.getElementById('carousel');
+      var carousel = document.getElementById('carousel');
       if (!products || products.length === 0) {
         carousel.innerHTML = '<div class="status">No products found.</div>';
         return;
       }
       carousel.innerHTML = products.map(function(p) {
-        // WR-02: escape title for use as an HTML attribute value
-        const imgHtml = p.image_url
-          ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'<span class=\\\"placeholder\\\">PHOTO</span>\'">'
-          : '<span class="placeholder">PHOTO</span>';
-        const price = p.price || '';
-        // CR-01: validate link scheme before inserting into href
-        const link = safeHref(p.link);
+        var imgHtml = p.image_url
+          ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'' + placeholderSvg.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\'">'
+          : placeholderSvg;
+        var price = p.price || '';
+        var link = safeHref(p.link);
         return (
           '<div class="card">' +
             '<div class="card-img">' + imgHtml + '</div>' +
@@ -163,48 +193,38 @@
               '<div class="card-title">' + (p.title || '') + '</div>' +
               '<div class="card-price">' + price + '</div>' +
               '<div class="card-desc">' + (p.description || '') + '</div>' +
+              '<a class="card-btn" href="' + link + '" target="_blank" rel="noopener noreferrer">View Product</a>' +
             '</div>' +
-            // WR-01: rel="noopener noreferrer" prevents tab-napping
-            '<a class="card-btn" href="' + link + '" target="_blank" rel="noopener noreferrer">VIEW</a>' +
           '</div>'
         );
       }).join('');
+      notifySizeToHost();
     }
 
-    // CR-02: Cryptographically random nonce — not predictable like Date.now()
     var mcpInitId = crypto.randomUUID
       ? crypto.randomUUID()
       : Array.from(crypto.getRandomValues(new Uint8Array(16)))
-          .map(function(b) { return b.toString(16).padStart(2, '0'); })
-          .join('');
+          .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
 
-    // CR-03: Derive parent origin from document.referrer; fall back to '*' only
-    // when no referrer is available (e.g. direct iframe src load)
     var parentOrigin = document.referrer ? new URL(document.referrer).origin : '*';
-
-    // CR-03: Track the trusted origin from the first valid inbound MCP message
     var trustedOrigin = null;
 
     window.addEventListener('message', function(event) {
       var msg = event.data;
       if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
 
-      // CR-03: Record origin on first valid MCP message for subsequent outbound sends
-      if (!trustedOrigin && event.origin) {
-        trustedOrigin = event.origin;
-      }
+      if (!trustedOrigin && event.origin) trustedOrigin = event.origin;
 
-      // Step 2: host responded to ui/initialize — now send initialized notification
       if (msg.id === mcpInitId && msg.result !== undefined) {
         window.parent.postMessage({
           jsonrpc: '2.0',
           method: 'ui/notifications/initialized',
           params: {}
         }, trustedOrigin || parentOrigin);
+        notifySizeToHost();
         return;
       }
 
-      // Handle tool result -- host forwards this after the tool runs
       if (msg.method === 'ui/notifications/tool-result' && msg.params) {
         var content = msg.params.content;
         if (Array.isArray(content)) {
@@ -213,10 +233,7 @@
             if (item.type === 'text') {
               try {
                 var data = JSON.parse(item.text);
-                if (Array.isArray(data.products)) {
-                  renderProducts(data.products);
-                  return;
-                }
+                if (Array.isArray(data.products)) { renderProducts(data.products); return; }
               } catch (e) {}
             }
           }
@@ -224,13 +241,9 @@
         return;
       }
 
-      // Fallback: direct products payload
-      if (msg.products && Array.isArray(msg.products)) {
-        renderProducts(msg.products);
-      }
+      if (msg.products && Array.isArray(msg.products)) renderProducts(msg.products);
     });
 
-    // Step 1: send ui/initialize request -- wait for host response before continuing
     window.parent.postMessage({
       jsonrpc: '2.0',
       id: mcpInitId,
@@ -242,14 +255,12 @@
       }
     }, parentOrigin);
 
-    // Self-render fallback: if no MCP host sends products within 500ms, render sample data
     var sampleProducts = [
-      { title: 'Wireless Headphones', price: '$79.99', image_url: '', description: 'Premium sound quality with noise cancellation.', link: '#' },
-      { title: 'Leather Wallet', price: '$34.99', image_url: '', description: 'Slim profile, genuine leather, RFID blocking.', link: '#' },
-      { title: 'Running Shoes', price: '$119.99', image_url: '', description: 'Lightweight and breathable for daily training.', link: '#' }
+      { title: 'Wireless Noise-Cancelling Headphones', price: '$79.99', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', description: 'Premium sound quality with active noise cancellation and 30-hour battery life.', link: '#' },
+      { title: 'Genuine Leather Wallet', price: '$34.99', image_url: 'https://images.unsplash.com/photo-1627123424574-724758594913?w=400&h=400&fit=crop', description: 'Slim profile, full-grain leather, RFID blocking with 6 card slots.', link: '#' },
+      { title: 'Running Shoes Pro', price: '$119.99', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', description: 'Lightweight and breathable mesh upper for daily training and racing.', link: '#' },
+      { title: 'Stainless Steel Water Bottle', price: '$24.99', image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop', description: 'Double-wall insulated, keeps drinks cold 24h or hot 12h. 32oz.', link: '#' }
     ];
-    // WR-03: fallbackFired guard prevents overwriting real products that arrived
-    // before the timeout fires
     fallbackTimer = setTimeout(function() {
       var carousel = document.getElementById('carousel');
       if (carousel && carousel.querySelector('.status') && !fallbackFired) {

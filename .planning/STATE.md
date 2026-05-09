@@ -2,11 +2,11 @@
 
 ## Current Status
 
-**Active Phase:** Phase 4 -- Backend Integration (COMPLETE)
+**Active Phase:** ALL PHASES COMPLETE ✓
 **Last Updated:** 2026-05-09
-**Last Session:** Plan 04-02 complete — Shopify template + POST /generate/shopify committed (b9191b9); 20 tests passing
-**Resume File:** `.planning/phases/04-backend-integration/04-02-SUMMARY.md`
-**Current Plan:** Phase 4 COMPLETE (2/2 plans done) — ready for Phase 5 or /gsd-verify-work
+**Last Session:** Phase 5 UAT passed — both OpenAPI and Shopify flows verified working end-to-end in Claude Desktop
+**Resume File:** None — milestone complete
+**Current Plan:** Phase 5 COMPLETE (2/2 plans done) — human UAT approved
 
 ## Phase Progress
 
@@ -16,7 +16,7 @@
 | 2: UI Templates | COMPLETE (3/3 plans done) | 02-01: light carousel; 02-02: dark grid; 02-03: refactor existing carousel |
 | 3: Web Setup Wizard | COMPLETE (3/3 plans done) | Plan 3a: wizard shell + source selector (bdea49b); Plan 3b: template picker + color customization (10e62b6); Plan 3c: credentials form + generate/result (39b82b1) |
 | 4: Backend Integration | COMPLETE (2/2 plans done) | Plan 04-01: FastAPI scaffold + /generate/openapi (a300204); Plan 04-02: Shopify template + /generate/shopify (b9191b9) |
-| 5: End-to-End Polish | Not started | |
+| 5: End-to-End Polish | COMPLETE (2/2 plans done) | 05-01: integration audit + template fixes (8a2e0fc); 05-02: README rewrite (c3e3cef); UAT: both flows verified in Claude Desktop 2026-05-09 |
 
 ## Key Context
 
@@ -50,3 +50,6 @@
 | 2026-05-09 | ALLOWED_TEMPLATES set in server.py | Validates template name before filesystem read; returns 400 for unknowns |
 | 2026-05-09 | GENERATED_REQUIREMENTS hardcoded string | fastmcp>=3.2.4 + httpx>=0.27.0 matches Python FastMCP API used in server.py.jinja2 |
 | 2026-05-09 | Shopify endpoint requires no GPT call | store_domain + storefront_token render directly into Jinja2 template; no spec fetch or LLM inference needed |
+| 2026-05-09 | README targets wizard-based flow as primary; assembler noted as legacy | Phase 5 closes the loop — README must reflect actual current system state |
+| 2026-05-09 | GPT prompt updated to request Python/httpx (was TypeScript/fetch) | products.json system prompt was never updated when pipeline switched from TS assembler to Python/FastMCP |
+| 2026-05-09 | inject_colors replaces before </head> not after <head> | Injected :root vars must come after template defaults in the cascade to win |

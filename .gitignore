@@ -22,3 +22,12 @@ generated/
 
 # GSD planning (local only)
 .planning/
+
+# IDE / AI tools
+.claude/
+.cursor/
+
+# Package files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

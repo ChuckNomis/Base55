@@ -13,8 +13,8 @@ from fastmcp.apps import AppConfig
 mcp = FastMCP("Shopify Products MCP", version="1.0.0")
 
 # ── Shopify Config (hardcoded by Base55 wizard) ──────────────────────────────
-SHOPIFY_STORE_DOMAIN = "{{ store_domain }}"
-SHOPIFY_STOREFRONT_TOKEN = "{{ storefront_token }}"
+SHOPIFY_STORE_DOMAIN = "mcp-lab-store.myshopify.com"
+SHOPIFY_STOREFRONT_TOKEN = "730cd5bd9c3beccd064e0fff4c030d79"
 SHOPIFY_API_VERSION = "2025-01"
 SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/api/{SHOPIFY_API_VERSION}/graphql.json"
 
@@ -22,7 +22,7 @@ SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/api/{SHOPIFY_API_VERSION}
 # regardless of which directory Claude launches "python server.py" from)
 import os as _os
 _HERE = _os.path.dirname(_os.path.abspath(__file__))
-with open(_os.path.join(_HERE, "{{ template_name }}.html"), "r", encoding="utf-8") as _f:
+with open(_os.path.join(_HERE, "grid-dark.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
 PRODUCTS_QUERY = """

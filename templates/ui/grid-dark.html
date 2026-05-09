@@ -13,31 +13,37 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg-color);
-      font-family: sans-serif;
-      height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow-y: auto;
       overflow-x: hidden;
     }
+    body::-webkit-scrollbar { width: 4px; }
+    body::-webkit-scrollbar-track { background: transparent; }
+    body::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 10px;
-      padding: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+      padding: 20px;
       width: 100%;
     }
     .card {
-      background: #1e1e1e;
+      background: #1a1a1a;
       border: 1px solid #2a2a2a;
-      border-radius: 8px;
+      border-radius: 12px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: #3a3a3a;
     }
     .card-img {
       width: 100%;
       aspect-ratio: 1 / 1;
-      background: #2a2a2a;
-      border-bottom: 1px solid #333;
+      background: #222;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -49,53 +55,67 @@
       object-fit: cover;
     }
     .card-img .placeholder {
-      color: #555;
-      font-size: 10px;
-    }
-    .card-body {
-      padding: 8px;
-      flex-grow: 1;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      align-items: center;
+      gap: 6px;
+      color: #444;
+    }
+    .card-img .placeholder span { font-size: 11px; }
+    .card-body {
+      padding: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
     }
     .card-title {
       color: #e0e0e0;
       font-weight: 600;
-      font-size: 11px;
-      line-height: 1.2;
+      font-size: 13px;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .card-price {
       color: var(--accent-color);
-      font-size: 11px;
-      font-weight: bold;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
     }
     .card-desc {
-      color: #777;
-      font-size: 9px;
-      line-height: 1.3;
-      flex-grow: 1;
+      color: #666;
+      font-size: 11px;
+      line-height: 1.5;
+      flex: 1;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
     .card-btn {
       display: block;
       text-align: center;
       width: 100%;
-      padding: 5px;
-      margin-top: 6px;
+      padding: 8px;
+      margin-top: 8px;
       background: var(--primary-color);
       color: white;
       border: none;
-      border-radius: 4px;
-      font-weight: bold;
+      border-radius: 7px;
+      font-weight: 600;
       cursor: pointer;
-      font-size: 10px;
+      font-size: 12px;
       text-decoration: none;
+      transition: background 0.15s ease;
     }
-    .card-btn:hover { opacity: 0.85; }
+    .card-btn:hover { background: #6d28d9; }
     .status {
       color: #555;
-      font-size: 13px;
-      padding: 20px;
+      font-size: 14px;
+      padding: 40px 20px;
       text-align: center;
       grid-column: 1 / -1;
     }
@@ -107,19 +127,15 @@
   </div>
 
   <script>
-    // CR-01: Validate link URLs — only allow http: and https: schemes
     function safeHref(url) {
       if (!url) return '#';
       try {
         var parsed = new URL(url);
-        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-          return url;
-        }
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return url;
       } catch (e) {}
       return '#';
     }
 
-    // WR-02: Escape values used in HTML attribute positions
     function escapeAttr(str) {
       return (str || '').replace(/&/g, '&amp;')
                         .replace(/"/g, '&quot;')
@@ -128,13 +144,22 @@
                         .replace(/>/g, '&gt;');
     }
 
-    // WR-03: fallbackFired guard — set before fallbackTimer so renderProducts
-    // clears the timer even if called before the timeout fires
+    var placeholderSvg = '<div class="placeholder"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>No Image</span></div>';
+
     var fallbackFired = false;
     var fallbackTimer = null;
 
+    function notifySizeToHost() {
+      var target = trustedOrigin || parentOrigin;
+      if (!target || target === '*') return;
+      window.parent.postMessage({
+        jsonrpc: '2.0',
+        method: 'ui/notifications/size-changed',
+        params: { width: document.documentElement.offsetWidth, height: document.documentElement.scrollHeight }
+      }, target);
+    }
+
     function renderProducts(products) {
-      // WR-03: cancel fallback timer and prevent double-render
       fallbackFired = true;
       clearTimeout(fallbackTimer);
 
@@ -144,12 +169,10 @@
         return;
       }
       grid.innerHTML = products.map(function(p) {
-        // WR-02: escape title for use as an HTML attribute value
         var imgHtml = p.image_url
-          ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'<span class=\\\"placeholder\\\">PHOTO</span>\'">'
-          : '<span class="placeholder">PHOTO</span>';
+          ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'' + placeholderSvg.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\'">'
+          : placeholderSvg;
         var price = p.price || '';
-        // CR-01: validate link scheme before inserting into href
         var link = safeHref(p.link);
         return (
           '<div class="card">' +
@@ -158,48 +181,38 @@
               '<div class="card-title">' + (p.title || '') + '</div>' +
               '<div class="card-price">' + price + '</div>' +
               '<div class="card-desc">' + (p.description || '') + '</div>' +
-              // WR-01: rel="noopener noreferrer" prevents tab-napping
-              '<a class="card-btn" href="' + link + '" target="_blank" rel="noopener noreferrer">VIEW</a>' +
+              '<a class="card-btn" href="' + link + '" target="_blank" rel="noopener noreferrer">View Product</a>' +
             '</div>' +
           '</div>'
         );
       }).join('');
+      requestAnimationFrame(notifySizeToHost);
     }
 
-    // CR-02: Cryptographically random nonce — not predictable like Date.now()
     var mcpInitId = crypto.randomUUID
       ? crypto.randomUUID()
       : Array.from(crypto.getRandomValues(new Uint8Array(16)))
-          .map(function(b) { return b.toString(16).padStart(2, '0'); })
-          .join('');
+          .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
 
-    // CR-03: Derive parent origin from document.referrer; fall back to '*' only
-    // when no referrer is available (e.g. direct iframe src load)
     var parentOrigin = document.referrer ? new URL(document.referrer).origin : '*';
-
-    // CR-03: Track the trusted origin from the first valid inbound MCP message
     var trustedOrigin = null;
 
     window.addEventListener('message', function(event) {
       var msg = event.data;
       if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
 
-      // CR-03: Record origin on first valid MCP message for subsequent outbound sends
-      if (!trustedOrigin && event.origin) {
-        trustedOrigin = event.origin;
-      }
+      if (!trustedOrigin && event.origin) trustedOrigin = event.origin;
 
-      // Step 2: host responded to ui/initialize — now send initialized notification
       if (msg.id === mcpInitId && msg.result !== undefined) {
         window.parent.postMessage({
           jsonrpc: '2.0',
           method: 'ui/notifications/initialized',
           params: {}
         }, trustedOrigin || parentOrigin);
+        notifySizeToHost();
         return;
       }
 
-      // Handle tool result -- host forwards this after the tool runs
       if (msg.method === 'ui/notifications/tool-result' && msg.params) {
         var content = msg.params.content;
         if (Array.isArray(content)) {
@@ -208,10 +221,7 @@
             if (item.type === 'text') {
               try {
                 var data = JSON.parse(item.text);
-                if (Array.isArray(data.products)) {
-                  renderProducts(data.products);
-                  return;
-                }
+                if (Array.isArray(data.products)) { renderProducts(data.products); return; }
               } catch (e) {}
             }
           }
@@ -219,13 +229,9 @@
         return;
       }
 
-      // Fallback: direct products payload
-      if (msg.products && Array.isArray(msg.products)) {
-        renderProducts(msg.products);
-      }
+      if (msg.products && Array.isArray(msg.products)) renderProducts(msg.products);
     });
 
-    // Step 1: send ui/initialize request -- wait for host response before continuing
     window.parent.postMessage({
       jsonrpc: '2.0',
       id: mcpInitId,
@@ -237,14 +243,14 @@
       }
     }, parentOrigin);
 
-    // Self-render fallback: if no MCP host sends products within 500ms, render sample data
     var sampleProducts = [
-      { title: 'Wireless Headphones', price: '$79.99', image_url: '', description: 'Premium sound with noise cancellation.', link: '#' },
-      { title: 'Leather Wallet', price: '$34.99', image_url: '', description: 'Slim genuine leather, RFID blocking.', link: '#' },
-      { title: 'Running Shoes', price: '$119.99', image_url: '', description: 'Lightweight breathable daily trainer.', link: '#' }
+      { title: 'Wireless Noise-Cancelling Headphones', price: '$79.99', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', description: 'Premium sound with active noise cancellation and 30-hour battery.', link: '#' },
+      { title: 'Genuine Leather Wallet', price: '$34.99', image_url: 'https://images.unsplash.com/photo-1627123424574-724758594913?w=400&h=400&fit=crop', description: 'Slim genuine leather, RFID blocking with 6 card slots.', link: '#' },
+      { title: 'Running Shoes Pro', price: '$119.99', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', description: 'Lightweight breathable mesh for daily training and racing.', link: '#' },
+      { title: 'Stainless Steel Water Bottle', price: '$24.99', image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop', description: 'Double-wall insulated, cold 24h or hot 12h. 32oz capacity.', link: '#' },
+      { title: 'Mechanical Keyboard', price: '$149.99', image_url: 'https://images.unsplash.com/photo-1601445638532-3ef6d56b3b0c?w=400&h=400&fit=crop', description: 'Tactile switches, full RGB backlight, compact tenkeyless layout.', link: '#' },
+      { title: 'Minimalist Watch', price: '$199.99', image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop', description: 'Sapphire crystal glass, Swiss movement, genuine leather strap.', link: '#' }
     ];
-    // WR-03: fallbackFired guard prevents overwriting real products that arrived
-    // before the timeout fires
     fallbackTimer = setTimeout(function() {
       var grid = document.getElementById('grid');
       if (grid && grid.querySelector('.status') && !fallbackFired) {
