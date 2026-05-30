@@ -46,7 +46,23 @@
       "Bash(npm show *)",
       "Bash(npx --yes degit modelcontextprotocol/ext-apps/src C:/Users/nadav/AppData/Local/Temp/ext-apps-src)",
       "Bash(npm pack *)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(python -m pytest src/backend/tests/ -v)",
+      "Bash(.venv\\\\Scripts\\\\pip install *)",
+      "Bash(.venv/Scripts/python -c \"import fastmcp; import inspect; src = inspect.getsourcefile\\(fastmcp\\); print\\(src\\)\")",
+      "Bash(python -c \"import fastmcp; print\\(fastmcp.settings.streamable_http_path\\)\")",
+      "Bash(.venv/Scripts/python -c \"import fastmcp; print\\(fastmcp.settings.streamable_http_path\\)\")",
+      "Bash(\"..\\\\\\\\.venv\\\\\\\\Scripts\\\\\\\\python.exe\" server.py)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/mcp)",
+      "Bash(nohup \"../.venv/Scripts/python.exe\" server.py)",
+      "Bash(echo \"PID: $!\")",
+      "Bash(curl -s -X POST http://localhost:8000/mcp -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1\"}}}')",
+      "Bash(curl *)",
+      "Bash(kill 109)",
+      "Bash(pkill -f \"python.exe server.py\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)",
+      "PowerShell(Stop-Process *)"
     ]
   }
 }

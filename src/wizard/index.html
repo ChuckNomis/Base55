@@ -637,6 +637,17 @@
           <p>Your MCP server is ready!</p>
           <a id="download-link" class="btn btn-primary" download="server.zip">&#x2B07; Download server.zip</a>
         </div>
+        <div style="margin-top:1.25rem;font-size:0.875rem;color:var(--text-muted,#9ca3af)">
+          <p style="margin:0 0 0.5rem;font-weight:600;color:var(--text,#e5e7eb)">How to connect:</p>
+          <ol style="margin:0;padding-left:1.25rem;line-height:1.8">
+            <li>Unzip <code>server.zip</code> to a folder, e.g. <code>C:\mcp\my-server\</code></li>
+            <li>Install dependencies: <code>pip install -r requirements.txt</code></li>
+            <li>Add to your Claude Desktop config (<code>claude_desktop_config.json</code>):<br>
+              <code style="display:block;margin-top:0.25rem;white-space:pre;background:#1e1e2e;padding:0.5rem 0.75rem;border-radius:4px">&#123;&quot;mcpServers&quot;:&#123;&quot;my-server&quot;:&#123;&quot;command&quot;:&quot;python&quot;,&quot;args&quot;:[&quot;C:\\mcp\\my-server\\server.py&quot;]&#125;&#125;&#125;</code>
+            </li>
+            <li>Restart Claude Desktop — it will launch the server automatically.</li>
+          </ol>
+        </div>
         <div class="nav-row" style="margin-top:1rem">
           <button class="btn btn-secondary" onclick="resetWizard()">Start over</button>
         </div>

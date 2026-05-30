@@ -1,113 +1,74 @@
 """
-Auto-generated Shopify MCP server by Base55.
+Auto-generated MCP server by Base55.
 Run:  pip install -r requirements.txt && python server.py
-
-Credentials are hardcoded below — to use a different store, regenerate
-via the Base55 wizard or edit SHOPIFY_STORE_DOMAIN / SHOPIFY_STOREFRONT_TOKEN.
 """
 import json
 import httpx
 from fastmcp import FastMCP
 from fastmcp.apps import AppConfig
 
-mcp = FastMCP("Shopify Products MCP", version="1.0.0")
-
-# ── Shopify Config (hardcoded by Base55 wizard) ──────────────────────────────
-SHOPIFY_STORE_DOMAIN = "mcp-lab-store.myshopify.com"
-SHOPIFY_STOREFRONT_TOKEN = "730cd5bd9c3beccd064e0fff4c030d79"
-SHOPIFY_API_VERSION = "2025-01"
-SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/api/{SHOPIFY_API_VERSION}/graphql.json"
+mcp = FastMCP("Generated Commerce MCP", version="1.0.0")
+BASE_URL = "http://127.0.0.1:8001"
 
 # Read carousel HTML at startup (relative to this script's directory so it works
 # regardless of which directory Claude launches "python server.py" from)
 import os as _os
 _HERE = _os.path.dirname(_os.path.abspath(__file__))
-with open(_os.path.join(_HERE, "grid-dark.html"), "r", encoding="utf-8") as _f:
+with open(_os.path.join(_HERE, "carousel-light.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
-PRODUCTS_QUERY = """
-  query SearchProducts($query: String!, $first: Int!) {
-    products(first: $first, query: $query) {
-      edges {
-        node {
-          id
-          title
-          description
-          onlineStoreUrl
-          images(first: 1) {
-            edges {
-              node {
-                url
-                altText
-              }
-            }
-          }
-          priceRange {
-            minVariantPrice {
-              amount
-              currencyCode
-            }
-          }
-        }
-      }
-    }
-  }
-"""
+# ── Generated tool functions ─────────────────────────────────────────────────
 
+
+# Tool: search_products
 async def search_products(query: str) -> dict:
-    """Query the Shopify Storefront API and shape products for the carousel."""
+    """
+    Search for products by a keyword and return them in a format suitable
+    for displaying in a product carousel.
+    """
+    import httpx
+    
+    base_url = "http://127.0.0.1:8001"
+    endpoint = f"{base_url}/v1/products/search"
+    
     async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            SHOPIFY_GRAPHQL_URL,
-            json={"query": PRODUCTS_QUERY, "variables": {"query": query or "", "first": 12}},
-            headers={
-                "Content-Type": "application/json",
-                "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_TOKEN,
-            },
-            timeout=15,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    if data.get("errors"):
-        raise RuntimeError(f"Shopify GraphQL error: {data['errors'][0].get('message', 'unknown')}")
-    edges = data.get("data", {}).get("products", {}).get("edges", [])
-    products = []
-    for edge in edges:
-        node = edge["node"]
-        price = node.get("priceRange", {}).get("minVariantPrice") or {}
-        amount = price.get("amount")
-        currency = price.get("currencyCode", "")
-        formatted_price = f"{currency} {float(amount):.2f}" if amount else ""
-        img_edges = node.get("images", {}).get("edges") or []
-        image_url = img_edges[0]["node"]["url"] if img_edges else ""
-        products.append({
-            "id": node.get("id", ""),
-            "title": node.get("title", "") or "",
-            "price": formatted_price,
-            "image_url": image_url,
-            "description": node.get("description", "") or "",
-            "link": node.get("onlineStoreUrl") or "#",
-        })
+        response = await client.get(endpoint, params={"query": query})
+        response.raise_for_status()
+        
+        products_data = response.json()
+        products = []
+        for item in products_data:
+            products.append({
+                "id": item.get("id", ""),
+                "title": item.get("title", ""),
+                "price": f"${item.get('price', 0):.2f}",
+                "image_url": item.get("image_url", ""),
+                "description": item.get("description", ""),
+                "link": item.get("link", "")
+            })
+        
     return {"products": products}
+
 
 # ── UI Resource ───────────────────────────────────────────────────────────────
 
 @mcp.resource(
-    "ui://shopify/products/carousel",
+    "ui://products/carousel",
     mime_type="text/html;profile=mcp-app",
     meta={"preferred-frame-size": ["100%", "320px"]},
 )
 def carousel_ui() -> str:
     return _CAROUSEL_HTML
 
-# ── Tool Registration ─────────────────────────────────────────────────────────
+# ── Tool Registrations ────────────────────────────────────────────────────────
 
-@mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
-async def shopify_search_products(query: str) -> str:
-    """Search Shopify products by keyword and display them in a visual carousel.
-    Leave query empty to browse all products."""
+
+@mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
+async def search_products_tool(query: str) -> str:
+    """Search for products by keyword and display them in a visual carousel"""
     result = await search_products(query)
     return json.dumps(result)
+
 
 # ── Server Start ──────────────────────────────────────────────────────────────
 

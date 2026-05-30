@@ -3,51 +3,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Products - Dark Grid</title>
+  <title>Products - Light Carousel</title>
   <style>
     :root {
-      --primary-color: #7c3aed;
-      --accent-color: #4ade80;
-      --bg-color: #0f0f0f;
+      --primary-color: #2563eb;
+      --accent-color: #16a34a;
+      --bg-color: #f3f4f6;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: var(--bg-color);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: hidden;
+      height: 380px;
+      display: flex;
+      align-items: center;
     }
-    body::-webkit-scrollbar { width: 4px; }
-    body::-webkit-scrollbar-track { background: transparent; }
-    body::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 14px;
+    .carousel {
+      display: flex;
+      gap: 16px;
+      overflow-x: auto;
+      overflow-y: hidden;
       padding: 20px;
       width: 100%;
+      height: 100%;
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db transparent;
+      align-items: center;
     }
+    .carousel::-webkit-scrollbar { height: 4px; }
+    .carousel::-webkit-scrollbar-track { background: transparent; }
+    .carousel::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
     .card {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 12px;
+      flex: 0 0 220px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      transition: transform 0.2s ease, border-color 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      height: 320px;
     }
     .card:hover {
-      transform: translateY(-2px);
-      border-color: #3a3a3a;
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
     }
     .card-img {
       width: 100%;
-      aspect-ratio: 1 / 1;
-      background: #222;
+      height: 160px;
+      background: #f9fafb;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
+      flex-shrink: 0;
+      border-bottom: 1px solid #f0f0f0;
     }
     .card-img img {
       width: 100%;
@@ -59,20 +71,21 @@
       flex-direction: column;
       align-items: center;
       gap: 6px;
-      color: #444;
+      color: #d1d5db;
     }
     .card-img .placeholder span { font-size: 11px; }
     .card-body {
-      padding: 12px;
+      padding: 14px;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 6px;
+      min-height: 0;
     }
     .card-title {
-      color: #e0e0e0;
+      color: #111827;
       font-weight: 600;
-      font-size: 13px;
+      font-size: 14px;
       line-height: 1.3;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -81,13 +94,13 @@
     }
     .card-price {
       color: var(--accent-color);
-      font-size: 15px;
+      font-size: 16px;
       font-weight: 700;
       letter-spacing: -0.3px;
     }
     .card-desc {
-      color: #666;
-      font-size: 11px;
+      color: #6b7280;
+      font-size: 12px;
       line-height: 1.5;
       flex: 1;
       display: -webkit-box;
@@ -99,30 +112,30 @@
       display: block;
       text-align: center;
       width: 100%;
-      padding: 8px;
-      margin-top: 8px;
+      padding: 9px;
       background: var(--primary-color);
       color: white;
       border: none;
-      border-radius: 7px;
+      border-radius: 8px;
       font-weight: 600;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
       text-decoration: none;
       transition: background 0.15s ease;
+      margin-top: auto;
     }
-    .card-btn:hover { background: #6d28d9; }
+    .card-btn:hover { background: #1d4ed8; }
     .status {
-      color: #555;
+      color: #9ca3af;
       font-size: 14px;
-      padding: 40px 20px;
+      padding: 20px;
       text-align: center;
-      grid-column: 1 / -1;
+      width: 100%;
     }
   </style>
-<style>:root{--primary-color:#ffd500;--accent-color:#e000a5;--bg-color:#ff0000;}</style></head>
+<style>:root{--primary-color:#3b82f6;--accent-color:#4ade80;--bg-color:#0f0f0f;}</style></head>
 <body>
-  <div class="grid" id="grid">
+  <div class="carousel" id="carousel">
     <div class="status">Loading products...</div>
   </div>
 
@@ -155,7 +168,7 @@
       window.parent.postMessage({
         jsonrpc: '2.0',
         method: 'ui/notifications/size-changed',
-        params: { width: document.documentElement.offsetWidth, height: document.documentElement.scrollHeight }
+        params: { width: document.documentElement.offsetWidth, height: document.documentElement.offsetHeight }
       }, target);
     }
 
@@ -163,12 +176,12 @@
       fallbackFired = true;
       clearTimeout(fallbackTimer);
 
-      var grid = document.getElementById('grid');
+      var carousel = document.getElementById('carousel');
       if (!products || products.length === 0) {
-        grid.innerHTML = '<div class="status">No products found.</div>';
+        carousel.innerHTML = '<div class="status">No products found.</div>';
         return;
       }
-      grid.innerHTML = products.map(function(p) {
+      carousel.innerHTML = products.map(function(p) {
         var imgHtml = p.image_url
           ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'' + placeholderSvg.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\'">'
           : placeholderSvg;
@@ -186,7 +199,7 @@
           '</div>'
         );
       }).join('');
-      requestAnimationFrame(notifySizeToHost);
+      notifySizeToHost();
     }
 
     var mcpInitId = crypto.randomUUID
@@ -237,23 +250,21 @@
       id: mcpInitId,
       method: 'ui/initialize',
       params: {
-        appInfo: { name: 'Products Grid Dark', version: '1.0.0' },
+        appInfo: { name: 'Products Carousel Light', version: '1.0.0' },
         appCapabilities: {},
         protocolVersion: '2026-01-26'
       }
     }, parentOrigin);
 
     var sampleProducts = [
-      { title: 'Wireless Noise-Cancelling Headphones', price: '$79.99', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', description: 'Premium sound with active noise cancellation and 30-hour battery.', link: '#' },
-      { title: 'Genuine Leather Wallet', price: '$34.99', image_url: 'https://images.unsplash.com/photo-1627123424574-724758594913?w=400&h=400&fit=crop', description: 'Slim genuine leather, RFID blocking with 6 card slots.', link: '#' },
-      { title: 'Running Shoes Pro', price: '$119.99', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', description: 'Lightweight breathable mesh for daily training and racing.', link: '#' },
-      { title: 'Stainless Steel Water Bottle', price: '$24.99', image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop', description: 'Double-wall insulated, cold 24h or hot 12h. 32oz capacity.', link: '#' },
-      { title: 'Mechanical Keyboard', price: '$149.99', image_url: 'https://images.unsplash.com/photo-1601445638532-3ef6d56b3b0c?w=400&h=400&fit=crop', description: 'Tactile switches, full RGB backlight, compact tenkeyless layout.', link: '#' },
-      { title: 'Minimalist Watch', price: '$199.99', image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop', description: 'Sapphire crystal glass, Swiss movement, genuine leather strap.', link: '#' }
+      { title: 'Wireless Noise-Cancelling Headphones', price: '$79.99', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', description: 'Premium sound quality with active noise cancellation and 30-hour battery life.', link: '#' },
+      { title: 'Genuine Leather Wallet', price: '$34.99', image_url: 'https://images.unsplash.com/photo-1627123424574-724758594913?w=400&h=400&fit=crop', description: 'Slim profile, full-grain leather, RFID blocking with 6 card slots.', link: '#' },
+      { title: 'Running Shoes Pro', price: '$119.99', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', description: 'Lightweight and breathable mesh upper for daily training and racing.', link: '#' },
+      { title: 'Stainless Steel Water Bottle', price: '$24.99', image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop', description: 'Double-wall insulated, keeps drinks cold 24h or hot 12h. 32oz.', link: '#' }
     ];
     fallbackTimer = setTimeout(function() {
-      var grid = document.getElementById('grid');
-      if (grid && grid.querySelector('.status') && !fallbackFired) {
+      var carousel = document.getElementById('carousel');
+      if (carousel && carousel.querySelector('.status') && !fallbackFired) {
         renderProducts(sampleProducts);
       }
     }, 500);
