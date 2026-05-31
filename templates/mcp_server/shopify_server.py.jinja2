@@ -54,6 +54,85 @@ PRODUCTS_QUERY = """
   }
 """
 
+ALL_PRODUCTS_QUERY = """
+  query GetAllProducts($first: Int!, $after: String) {
+    products(first: $first, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          title
+          description
+          onlineStoreUrl
+          images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+"""
+
+async def get_all_products() -> dict:
+    """Fetch every product from the Shopify store using cursor-based pagination."""
+    all_products = []
+    cursor = None
+    async with httpx.AsyncClient() as client:
+        while True:
+            variables = {"first": 250}
+            if cursor:
+                variables["after"] = cursor
+            resp = await client.post(
+                SHOPIFY_GRAPHQL_URL,
+                json={"query": ALL_PRODUCTS_QUERY, "variables": variables},
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_TOKEN,
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("errors"):
+                raise RuntimeError(f"Shopify GraphQL error: {data['errors'][0].get('message', 'unknown')}")
+            products_data = data.get("data", {}).get("products", {})
+            for edge in products_data.get("edges", []):
+                node = edge["node"]
+                price = node.get("priceRange", {}).get("minVariantPrice") or {}
+                amount = price.get("amount")
+                currency = price.get("currencyCode", "")
+                formatted_price = f"{currency} {float(amount):.2f}" if amount else ""
+                img_edges = node.get("images", {}).get("edges") or []
+                image_url = img_edges[0]["node"]["url"] if img_edges else ""
+                all_products.append({
+                    "id": node.get("id", ""),
+                    "title": node.get("title", "") or "",
+                    "price": formatted_price,
+                    "image_url": image_url,
+                    "description": node.get("description", "") or "",
+                    "link": node.get("onlineStoreUrl") or "#",
+                })
+            page_info = products_data.get("pageInfo", {})
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = page_info.get("endCursor")
+    return {"products": all_products}
+
+
 async def search_products(query: str) -> dict:
     """Query the Shopify Storefront API and shape products for the carousel."""
     async with httpx.AsyncClient() as client:
@@ -100,12 +179,17 @@ async def search_products(query: str) -> dict:
 def carousel_ui() -> str:
     return _CAROUSEL_HTML
 
-# ── Tool Registration ─────────────────────────────────────────────────────────
+# ── Tool Registrations ────────────────────────────────────────────────────────
+
+@mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
+async def shopify_get_all_products() -> str:
+    """Fetch ALL products from the Shopify store and display them in a visual carousel."""
+    result = await get_all_products()
+    return json.dumps(result)
 
 @mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
 async def shopify_search_products(query: str) -> str:
-    """Search Shopify products by keyword and display them in a visual carousel.
-    Leave query empty to browse all products."""
+    """Search Shopify products by keyword and display them in a visual carousel."""
     result = await search_products(query)
     return json.dumps(result)
 
