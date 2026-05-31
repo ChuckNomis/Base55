@@ -865,22 +865,20 @@
       var pathTail = path.replace('../../', '');
       if (!currentSrc.endsWith(pathTail)) {
         iframe.src = path;
-        iframe.onload = function() { applyColorsToIframe(iframe); };
+        iframe.onload = function() { setTimeout(function() { applyColorsToIframe(iframe); }, 50); };
       } else {
         applyColorsToIframe(iframe);
       }
     }
 
     function applyColorsToIframe(iframe) {
-      try {
-        var root = iframe.contentDocument && iframe.contentDocument.documentElement;
-        if (!root) return;
-        root.style.setProperty('--primary-color', state.colors.primary);
-        root.style.setProperty('--accent-color', state.colors.accent);
-        root.style.setProperty('--bg-color', state.colors.bg);
-      } catch (e) {
-        // cross-origin guard — no-op if file:// restriction kicks in
-      }
+      if (!iframe.contentWindow) return;
+      iframe.contentWindow.postMessage({
+        type: 'set-colors',
+        primary: state.colors.primary,
+        accent: state.colors.accent,
+        bg: state.colors.bg,
+      }, '*');
     }
 
     document.getElementById('color-primary').addEventListener('input', function(e) {

@@ -212,6 +212,13 @@
 
     window.addEventListener('message', function(event) {
       var msg = event.data;
+      if (msg && msg.type === 'set-colors') {
+        var r = document.documentElement;
+        if (msg.primary) r.style.setProperty('--primary-color', msg.primary);
+        if (msg.accent)  r.style.setProperty('--accent-color',  msg.accent);
+        if (msg.bg)      r.style.setProperty('--bg-color',      msg.bg);
+        return;
+      }
       if (!msg || typeof msg !== 'object' || msg.jsonrpc !== '2.0') return;
 
       if (!trustedOrigin && event.origin) trustedOrigin = event.origin;
