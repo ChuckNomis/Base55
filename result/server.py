@@ -2,8 +2,6 @@
 Auto-generated MCP server by Base55.
 Run:  pip install -r requirements.txt && python server.py
 """
-import asyncio
-import base64
 import json
 import httpx
 from fastmcp import FastMCP
@@ -19,86 +17,62 @@ _HERE = _os.path.dirname(_os.path.abspath(__file__))
 with open(_os.path.join(_HERE, "carousel.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
-_IMAGE_EMBED_LIMIT = 20
-
-async def _embed_images(products: list) -> list:
-    """Embed images as base64 data URIs for the first _IMAGE_EMBED_LIMIT products.
-    Beyond that limit the image_url is cleared so the carousel shows a placeholder,
-    keeping the tool result within Claude's context window."""
-    async def _fetch(url: str) -> str:
-        if not url:
-            return ""
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                r = await client.get(url)
-                if r.status_code == 200:
-                    mime = r.headers.get("content-type", "image/jpeg").split(";")[0]
-                    data = base64.b64encode(r.content).decode()
-                    return f"data:{mime};base64,{data}"
-        except Exception:
-            pass
-        return url
-
-    to_embed = products[:_IMAGE_EMBED_LIMIT]
-    beyond = products[_IMAGE_EMBED_LIMIT:]
-
-    urls = [p.get("image_url", "") for p in to_embed]
-    data_uris = await asyncio.gather(*[_fetch(u) for u in urls])
-    for product, uri in zip(to_embed, data_uris):
-        product["image_url"] = uri
-    for product in beyond:
-        product["image_url"] = ""
-    return products
-
 # ── Generated tool functions ─────────────────────────────────────────────────
 
 
 # Tool: get_all_products
 async def get_all_products() -> dict:
     """
-    Fetches all products from the catalog and returns them in a structured format suitable for a product carousel.
-    The function handles pagination and continues fetching until all products are retrieved.
+    Fetch all products from the catalog and return them in a format
+    suitable for a carousel display. This function handles pagination
+    to ensure all products are retrieved across all available pages.
     """
-    import httpx
     base_url = "http://127.0.0.1:8001"
-    products = []
+    endpoint = "/v1/products"
     page = 1
-    has_next = True
+    page_size = 20
+    all_products = []
 
     async with httpx.AsyncClient() as client:
-        while has_next:
-            response = await client.get(f"{base_url}/v1/products", params={"page": page})
+        while True:
+            response = await client.get(
+                f"{base_url}{endpoint}",
+                params={"page": page, "page_size": page_size}
+            )
             response.raise_for_status()
+
             data = response.json()
-            for item in data.get("items", []):
-                products.append({
+            items = data.get("items", [])
+
+            for item in items:
+                product = {
                     "id": item.get("id", ""),
                     "title": item.get("title", ""),
                     "price": f"${item.get('price', 0):.2f}",
-                    "image_url": item.get("image_url") or "",
-                    "description": item.get("description") or "",
-                    "link": item.get("link") or "",
-                })
-            has_next = data.get("has_next", False)
+                    "image_url": item.get("image_url", ""),
+                    "description": item.get("description", ""),
+                    "link": item.get("link", "")
+                }
+                all_products.append(product)
+
+            if not data.get("has_next", False):
+                break
+
             page += 1
 
-    return {"products": products}
+    return {"products": all_products}
 
 
 # Tool: search_products
 async def search_products(query: str) -> dict:
     """
-    Search for products by a keyword and return a list of products
-    formatted for a product carousel.
+    Search for products using a query string and return them in a carousel-compatible format.
     """
     import httpx
 
     base_url = "http://127.0.0.1:8001"
-    endpoint = "/v1/products/search"
-    url = f"{base_url}{endpoint}"
-    
     async with httpx.AsyncClient() as client:
-        response = await client.get(url, params={"query": query})
+        response = await client.get(f"{base_url}/v1/products/search", params={"query": query})
         response.raise_for_status()
         products_data = response.json()
 
@@ -133,22 +107,18 @@ def carousel_ui() -> str:
 @mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
 
 async def get_all_products_tool() -> str:
-    """Fetch ALL products from the catalog and display them in a visual carousel. Must return every product across all pages."""
+    """Show ALL products in a visual carousel. Use this ONLY when the user wants to browse everything with no specific filter (e.g. 'show me all products', 'what do you have?'). If the user mentions ANY specific product type, name, or category, use search_products_tool instead."""
     result = await get_all_products()
 
-    if isinstance(result.get("products"), list):
-        result["products"] = await _embed_images(result["products"])
     return json.dumps(result)
 
 
 @mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
 
 async def search_products_tool(query: str) -> str:
-    """Search for products by keyword and display them in a visual carousel"""
+    """Search for products by keyword and display results in a visual carousel. Use this whenever the user mentions ANY specific product, type, or category (e.g. 'phone', 'shoes', 'blue jacket', 'something for running'). Always prefer this over get_all_products_tool when any search term is present."""
     result = await search_products(query)
 
-    if isinstance(result.get("products"), list):
-        result["products"] = await _embed_images(result["products"])
     return json.dumps(result)
 
 

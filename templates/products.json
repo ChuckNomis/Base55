@@ -5,7 +5,7 @@
   "tools": [
     {
       "name": "get_all_products",
-      "description": "Fetch ALL products from the catalog and display them in a visual carousel. Must return every product across all pages.",
+      "description": "Show ALL products in a visual carousel. Use this ONLY when the user wants to browse everything with no specific filter (e.g. 'show me all products', 'what do you have?'). If the user mentions ANY specific product type, name, or category, use search_products_tool instead.",
       "signature": "get_all_products()",
       "fetch_all": true,
       "input_schema": {
@@ -36,7 +36,7 @@
     },
     {
       "name": "search_products",
-      "description": "Search for products by keyword and display them in a visual carousel",
+      "description": "Search for products by keyword and display results in a visual carousel. Use this whenever the user mentions ANY specific product, type, or category (e.g. 'phone', 'shoes', 'blue jacket', 'something for running'). Always prefer this over get_all_products_tool when any search term is present.",
       "input_schema": {
         "type": "object",
         "properties": {
