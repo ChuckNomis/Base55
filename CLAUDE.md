@@ -8,131 +8,159 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Two integration paths exist today:
 
-1. **OpenAPI path** -- Takes any OpenAPI spec and uses GPT-4o to generate TypeScript tool functions, assembled into a complete MCP server.
-2. **Shopify path** -- A pre-built MCP server that connects to the Shopify Storefront API and displays products in a carousel.
+1. **OpenAPI path** -- Takes any OpenAPI spec URL, uses GPT-4o to generate Python tool functions, then assembles them via Jinja2 into a complete FastMCP server (returned as a zip).
+2. **Shopify path** -- No GPT call. The wizard takes store credentials and renders a configured FastMCP server directly via Jinja2.
 
 ```
-OpenAPI spec -> GPT-4o -> TypeScript tool functions -> Handlebars assembler -> MCP server
+OpenAPI spec -> GPT-4o -> Python tool functions -> Jinja2 render -> server.zip (FastMCP)
+Shopify creds                                    -> Jinja2 render -> server.zip (FastMCP)
 ```
 
 ## Repository Structure
 
 ```
 src/
+  backend/
+    server.py         # FastAPI backend (port 3001) — /generate/openapi and /generate/shopify
+    requirements.txt  # fastapi, uvicorn, jinja2, httpx, pydantic, python-dotenv, openai
+  wizard/
+    index.html        # Web wizard UI (vanilla HTML/CSS/JS — open directly in browser)
   openapi/
-    generator/     # Python: calls GPT-4o to generate tool functions from OpenAPI spec
-    assembler/     # TypeScript: assembles tools_manifest.json into a deployable MCP server
-    generated_server/  # Output dir (git-ignored) -- recreated on each pipeline run
-  shopify/         # TypeScript MCP server for Shopify Storefront API
-  wizard/          # (Phase 3) Web setup wizard -- not yet built (src/wizard/)
+    generator/        # Python: calls GPT-4o to generate tool functions from OpenAPI spec
+      generate.py     # CLI entrypoint (not used by wizard; backend calls core.py directly)
+      core.py         # make_all_tools() orchestrates tool generation loop
+      llm.py          # call_gpt() sends prompts to GPT-4o, returns JSON
+      prompts.py      # injects OpenAPI spec and base URL into GPT prompt
+      models.py       # Pydantic models: GeneratedTool, ToolsManifest
+    assembler/        # Legacy TypeScript Handlebars assembler — NOT used by current wizard
+  shopify/            # Legacy standalone TypeScript Shopify MCP demo — NOT used by wizard
 templates/
-  products.json           # Template definition: system prompt + tool specs
-  mcp_server/server.hbs   # Handlebars scaffold for generated MCP server
-  ui/carousel.html        # Dark-theme product carousel UI
-demo_api/          # FastAPI demo commerce API (reference OpenAPI source)
-docs/              # Project documents, meeting notes
+  mcp_server/
+    server.py.jinja2         # Jinja2 scaffold for OpenAPI-path generated server.py
+    shopify_server.py.jinja2 # Jinja2 scaffold for Shopify-path generated server.py
+  ui/
+    carousel.html       # Dark-theme horizontal product carousel
+    carousel-light.html # Light-theme horizontal product carousel
+    grid-dark.html      # Dark compact 2-3 column grid
+  products.json         # Tool spec definition: system prompt + tool specs for GPT
+demo_api/              # FastAPI demo commerce API (example OpenAPI source for testing)
+result/                # Example generated server output (for reference)
+docs/                  # Project documents and meeting notes
 ```
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python, FastAPI, Uvicorn (port 3001) |
+| LLM integration | OpenAI SDK, GPT-4o |
+| Templating | Jinja2 (`.jinja2` files → Python servers) |
+| HTTP client | httpx (async) |
+| Data validation | Pydantic v2 |
+| Env config | python-dotenv |
+| Wizard frontend | Vanilla HTML/CSS/JS (no build step) |
+| Generated servers | Python, FastMCP ≥3.2.4, httpx |
+| Demo API | Python, FastAPI (port 8001) |
+| Carousel UI | Pure HTML/CSS (CSS custom properties for theming) |
+
+**No TypeScript or Node.js is in active use.** The legacy `src/openapi/assembler/` (Handlebars/TS) and `src/shopify/` (TS) directories are superseded by the Python/Jinja2 pipeline.
 
 ## Setup
 
 ```bash
-# Python dependencies (OpenAPI generator + demo API)
-pip install -r src/openapi/generator/requirements.txt
-pip install -r demo_api/requirements.txt
+# Backend dependencies
+pip install -r src/backend/requirements.txt
 
-# Build the assembler (TypeScript -> JS)
-cd src/openapi/assembler && npm install && npm run build && cd ../../..
+# Optional: demo API (only needed for local OpenAPI testing)
+pip install -r demo_api/requirements.txt
 ```
 
-Requires an `OPENAI_API_KEY` env var for the OpenAPI generator step.
+Requires an `OPENAI_API_KEY` env var for the OpenAPI path.
 
-## Running the OpenAPI Pipeline
+## Running the Wizard
 
-**1. Start the demo commerce API** (provides an example OpenAPI spec):
+**1. Start the backend:**
+```bash
+uvicorn src.backend.server:app --port 3001
+```
+
+**2. Open the wizard:**
+Open `src/wizard/index.html` in your browser (double-click or `file://` URL).
+
+**3. (Optional) Start the demo commerce API for OpenAPI testing:**
 ```bash
 uvicorn demo_api.main:app --host 127.0.0.1 --port 8001
 ```
 OpenAPI spec available at `http://127.0.0.1:8001/openapi.json`
 
-**2. Generate the MCP server:**
-```bash
-export OPENAI_API_KEY=sk-...
+## Architecture
 
-python -m src.openapi.generator.generate \
-  --openapi http://127.0.0.1:8001/openapi.json \
-  --template templates/products.json \
-  --output-dir src/openapi/generated_server/
-```
-This calls GPT-4o to write tool functions, saves `tools_manifest.json`, then runs the assembler to produce `src/openapi/generated_server/`.
+### Backend (`src/backend/server.py` — FastAPI)
+- `POST /generate/openapi` — fetches OpenAPI spec, calls GPT-4o via `make_all_tools()`, renders `server.py.jinja2`, returns `server.zip`
+- `POST /generate/shopify` — renders `shopify_server.py.jinja2` with credentials, returns `server.zip`
+- Color injection: injects CSS custom properties into the selected UI HTML before zipping
+- Pydantic validators block template injection in color fields
 
-**3. Run the generated server:**
-```bash
-cd src/openapi/generated_server && npm install && npm start
-```
+### OpenAPI Generator (`src/openapi/generator/` — Python)
+- `core.py` — `make_all_tools()` loops over tool specs from `products.json`, calls GPT-4o for each
+- `llm.py` — `call_gpt()` sends system+user prompt to GPT-4o (`gpt-4o`), returns JSON
+- `prompts.py` — injects OpenAPI spec and base URL into the GPT prompt
+- `models.py` — Pydantic models: `GeneratedTool`, `ToolsManifest`
 
-**4. Debug with MCP Inspector:**
+### Templates (`templates/`)
+- `products.json` — tool spec definition: system prompt, tool names/descriptions/output schemas
+- `mcp_server/server.py.jinja2` — Jinja2 scaffold; GPT-generated tool functions injected here
+- `mcp_server/shopify_server.py.jinja2` — Jinja2 scaffold for Shopify path (no GPT)
+- `ui/*.html` — carousel and grid UI templates with CSS custom property theming
+
+### Generated Server Output
+Each generated zip contains:
+- `server.py` — Python/FastMCP MCP server (stdio transport)
+- `requirements.txt` — `fastmcp>=3.2.4`, `httpx>=0.27.0`
+- `{template}.html` — color-customized carousel/grid UI
+
+### Wizard Frontend (`src/wizard/index.html`)
+- Pure HTML/CSS/JS, no npm or build step
+- Step-by-step flow: intro → integration type → template → colors → credentials → download
+- Talks to `http://localhost:3001` via POST requests
+- Handles file download of `server.zip` directly in browser
+
+### Demo API (`demo_api/` — Python/FastAPI)
+- Paginated product list, keyword search, single-product lookup
+- Loads from `demo_api/data/products.json`
+- `demo_api.yaml` — OpenAPI 3.0 spec (usable as generator input in the wizard)
+
+## Key Design Decisions
+
+- **GPT writes only tool logic** — the function body that calls the API and maps the response. All MCP plumbing, UI wiring, and transport setup come from Jinja2 templates.
+- **Base URLs are hardcoded** in generated functions (from `servers[0].url` in the OpenAPI spec). No runtime env config in the generated server.
+- **Output schema is enforced** — `products.json` defines the exact shape GPT must return. Missing fields return empty strings; prices formatted as `"$29.99"`.
+- **Carousel UI data flow** — handles three message formats (direct, MCP method, tool result) for flexibility across MCP host environments.
+- **Jinja2 over Handlebars** — the original TypeScript/Handlebars assembler was replaced with Python/Jinja2 to keep the entire pipeline in one language.
+- **No-build wizard** — the frontend is a single HTML file opened directly in the browser; no npm, webpack, or build step required.
+
+## Adding a New UI Template
+
+1. Add a new HTML file to `templates/ui/` using CSS custom properties (`--primary-color`, `--accent-color`, `--bg-color`)
+2. Add the template name (without `.html`) to `ALLOWED_TEMPLATES` in `src/backend/server.py`
+3. Add the option to the wizard UI in `src/wizard/index.html`
+
+## Adding a New Integration Path
+
+1. Create a new Jinja2 template in `templates/mcp_server/`
+2. Add a new Pydantic request model and endpoint in `src/backend/server.py`
+3. Add the wizard steps in `src/wizard/index.html`
+
+## Debugging
+
+**MCP Inspector** — inspect any running FastMCP server:
 ```bash
 npx @modelcontextprotocol/inspector
 ```
 
-## Running the Shopify Demo
+**Backend logs** — `uvicorn` prints request logs; check here if generation fails.
 
-**Prerequisites:** Create a `.env` file in `src/shopify/` with:
-```
-SHOPIFY_STORE_DOMAIN=your-store.myshopify.com
-SHOPIFY_STOREFRONT_TOKEN=your-storefront-access-token
-```
-
-**Install and run:**
-```bash
-cd src/shopify && npm install && npx tsx index.ts
-```
-
-## Architecture
-
-### OpenAPI Generator (`src/openapi/generator/` -- Python)
-- `generate.py` -- CLI entrypoint; loads OpenAPI spec + template, writes manifest, calls assembler
-- `core.py` -- `make_all_tools()` orchestrates the loop over template tool definitions
-- `llm.py` -- `call_gpt()` sends system+user prompt to GPT-4o, returns JSON
-- `prompts.py` -- injects OpenAPI spec and base URL into the GPT prompt
-- `models.py` -- Pydantic models: `GeneratedTool`, `ToolsManifest`
-
-### Assembler (`src/openapi/assembler/` -- TypeScript)
-- `src/index.ts` -- reads `tools_manifest.json`, renders Handlebars templates, writes output files
-- Pure transformation: no LLM calls, runs in milliseconds, re-runnable
-
-### Templates (`templates/` -- shared)
-- `products.json` -- template definition: system prompt, tool specs (name/description/output schema)
-- `mcp_server/server.hbs` -- Handlebars scaffold; GPT-generated tool code is injected here
-- `ui/carousel.html` -- dark-theme product carousel (communicates via `postMessage`)
-
-### Shopify Demo (`src/shopify/` -- TypeScript)
-- `index.ts` -- MCP server that queries Shopify Storefront API and returns products as carousel data
-- `carousel.html` -- the carousel UI (same dark-theme design as the OpenAPI path)
-- Requires `SHOPIFY_STORE_DOMAIN` and `SHOPIFY_STOREFRONT_TOKEN` env vars
-
-### Demo API (`demo_api/` -- Python/FastAPI)
-- Paginated product list, keyword search, single-product lookup
-- Loads from `demo_api/data/products.json`
-- `demo_api.yaml` -- OpenAPI 3.0 spec (usable as generator input)
-
-### Generated Server (`src/openapi/generated_server/` -- git-ignored)
-Recreated on each pipeline run. Contains: `index.ts`, `carousel.html`, `package.json`, `tsconfig.json`
-
-## Key Design Decisions
-
-- **GPT writes only tool logic** -- the function body that calls the API and maps the response. All MCP plumbing, UI wiring, and transport setup come from templates.
-- **Base URLs are hardcoded** in generated functions (from `servers[0].url` in the OpenAPI spec). No runtime env config in the generated server.
-- **Output schema is enforced** -- templates define the exact shape GPT must return. Missing fields return empty strings; prices formatted as `"$29.99"`.
-- **Carousel UI data flow** -- handles three message formats (direct, MCP method, tool result) for flexibility across MCP host environments.
-- **Templates are repo-root level** -- `templates/` is a top-level directory, not buried inside a pipeline-specific folder, because templates are shared across both paths and extended in Phase 2.
-
-## Adding a New Tool Type
-
-1. Create a new template JSON in `templates/` with `system_prompt`, `tools[]`, and `ui_template`
-2. Add a matching UI HTML in `templates/ui/`
-3. No Python or assembler code changes needed
-
-## VS Code MCP Integration
-
-`.vscode/mcp.json` points to `src/openapi/generated_server/` for local debugging via MCP Inspector.
+**Wizard errors** — shown inline in the wizard UI. Common causes:
+- Backend not running (`uvicorn src.backend.server:app --port 3001`)
+- Invalid spec URL (must be reachable from the backend process)
+- Missing `OPENAI_API_KEY` for the OpenAPI path

@@ -62,7 +62,8 @@
       "Bash(pkill -f \"python.exe server.py\")",
       "Bash(netstat -ano)",
       "Bash(taskkill *)",
-      "PowerShell(Stop-Process *)"
+      "PowerShell(Stop-Process *)",
+      "Bash(dir C:\\\\Users\\\\nadav\\\\Documents\\\\GitHub\\\\Base55 *)"
     ]
   }
 }
