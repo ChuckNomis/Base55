@@ -19,8 +19,12 @@ _HERE = _os.path.dirname(_os.path.abspath(__file__))
 with open(_os.path.join(_HERE, "{{ template_name }}.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
+_IMAGE_EMBED_LIMIT = 20
+
 async def _embed_images(products: list) -> list:
-    """Fetch each product image and replace image_url with a base64 data URI."""
+    """Embed images as base64 data URIs for the first _IMAGE_EMBED_LIMIT products.
+    Beyond that limit the image_url is cleared so the carousel shows a placeholder,
+    keeping the tool result within Claude's context window."""
     async def _fetch(url: str) -> str:
         if not url:
             return ""
@@ -35,10 +39,15 @@ async def _embed_images(products: list) -> list:
             pass
         return url
 
-    urls = [p.get("image_url", "") for p in products]
+    to_embed = products[:_IMAGE_EMBED_LIMIT]
+    beyond = products[_IMAGE_EMBED_LIMIT:]
+
+    urls = [p.get("image_url", "") for p in to_embed]
     data_uris = await asyncio.gather(*[_fetch(u) for u in urls])
-    for product, uri in zip(products, data_uris):
+    for product, uri in zip(to_embed, data_uris):
         product["image_url"] = uri
+    for product in beyond:
+        product["image_url"] = ""
     return products
 
 # ── Generated tool functions ─────────────────────────────────────────────────

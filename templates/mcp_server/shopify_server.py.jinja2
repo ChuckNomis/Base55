@@ -5,6 +5,8 @@ Run:  pip install -r requirements.txt && python server.py
 Credentials are hardcoded below — to use a different store, regenerate
 via the Base55 wizard or edit SHOPIFY_STORE_DOMAIN / SHOPIFY_STOREFRONT_TOKEN.
 """
+import asyncio
+import base64
 import json
 import httpx
 from fastmcp import FastMCP
@@ -169,6 +171,39 @@ async def search_products(query: str) -> dict:
         })
     return {"products": products}
 
+# ── Image Embedding ───────────────────────────────────────────────────────────
+
+_IMAGE_EMBED_LIMIT = 20
+
+async def _embed_images(products: list) -> list:
+    """Embed images as base64 data URIs for the first _IMAGE_EMBED_LIMIT products.
+    Beyond that limit the image_url is cleared so the carousel shows a placeholder,
+    keeping the tool result within Claude's context window."""
+    async def _fetch(url: str) -> str:
+        if not url:
+            return ""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(url)
+                if r.status_code == 200:
+                    mime = r.headers.get("content-type", "image/jpeg").split(";")[0]
+                    data = base64.b64encode(r.content).decode()
+                    return f"data:{mime};base64,{data}"
+        except Exception:
+            pass
+        return url
+
+    to_embed = products[:_IMAGE_EMBED_LIMIT]
+    beyond = products[_IMAGE_EMBED_LIMIT:]
+    urls = [p.get("image_url", "") for p in to_embed]
+    data_uris = await asyncio.gather(*[_fetch(u) for u in urls])
+    for product, uri in zip(to_embed, data_uris):
+        product["image_url"] = uri
+    for product in beyond:
+        product["image_url"] = ""
+    return products
+
+
 # ── UI Resource ───────────────────────────────────────────────────────────────
 
 @mcp.resource(
@@ -185,12 +220,16 @@ def carousel_ui() -> str:
 async def shopify_get_all_products() -> str:
     """Fetch ALL products from the Shopify store and display them in a visual carousel."""
     result = await get_all_products()
+    if isinstance(result.get("products"), list):
+        result["products"] = await _embed_images(result["products"])
     return json.dumps(result)
 
 @mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
 async def shopify_search_products(query: str) -> str:
     """Search Shopify products by keyword and display them in a visual carousel."""
     result = await search_products(query)
+    if isinstance(result.get("products"), list):
+        result["products"] = await _embed_images(result["products"])
     return json.dumps(result)
 
 # ── Server Start ──────────────────────────────────────────────────────────────
