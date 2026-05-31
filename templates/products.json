@@ -4,6 +4,37 @@
   "system_prompt": "You are generating the data-fetching function for a Products MCP tool.\n\nThe tool's UI is a product carousel. The function MUST return data in exactly this shape:\n{\n  \"products\": [\n    {\n      \"id\": str,\n      \"title\": str,\n      \"price\": str,\n      \"image_url\": str,\n      \"description\": str,\n      \"link\": str\n    }\n  ]\n}\n\nYour task:\n1. Examine the OpenAPI spec in the user message.\n2. Identify the single best endpoint that returns a list of products matching a search keyword or query.\n3. Generate a single Python async function that calls that endpoint using httpx and returns data in the shape above.\n\nStrict rules:\n- Respond ONLY with a JSON object in this format: {\"code\": \"<the function as a string>\"}\n- The function must be standalone: no import statements, no class wrappers, no MCP decorators\n- Hardcode the base URL directly from the OpenAPI spec's servers[0].url — do NOT use environment variables\n- Map response fields to match the output schema (e.g., API's 'name' field maps to 'title', 'img' maps to 'image_url')\n- For any field missing from the API response, return an empty string \"\"\n- Price must be a string (convert numbers: e.g., 29.99 → \"$29.99\")\n- Include a docstring on the function describing what it does\n- Use async/await with httpx.AsyncClient()\n- The function signature must be: async def search_products(query: str) -> dict\n- The function must be named exactly as specified in the user message",
   "tools": [
     {
+      "name": "get_all_products",
+      "description": "Fetch ALL products from the catalog and display them in a visual carousel. Must return every product across all pages.",
+      "signature": "get_all_products()",
+      "fetch_all": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id":          { "type": "string" },
+                "title":       { "type": "string" },
+                "price":       { "type": "string", "description": "Formatted price string, e.g. '$29.99'" },
+                "image_url":   { "type": "string" },
+                "description": { "type": "string" },
+                "link":        { "type": "string" }
+              },
+              "required": ["id", "title", "price"]
+            }
+          }
+        },
+        "required": ["products"]
+      }
+    },
+    {
       "name": "search_products",
       "description": "Search for products by keyword and display them in a visual carousel",
       "input_schema": {

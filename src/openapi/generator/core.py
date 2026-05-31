@@ -19,7 +19,7 @@ def make_all_tools(openapi_spec: dict, template: dict) -> ToolsManifest:
 
     for tool_def in template.get("tools", []):
         print(f"[Generator] Generating tool: {tool_def['name']}")
-        user_prompt = build_user_prompt(template, openapi_spec, base_url)
+        user_prompt = build_user_prompt(tool_def, openapi_spec, base_url)
         raw = call_gpt(system_prompt, user_prompt)
 
         parsed = json.loads(raw)
@@ -29,6 +29,7 @@ def make_all_tools(openapi_spec: dict, template: dict) -> ToolsManifest:
             name=tool_def["name"],
             code=code,
             description=tool_def["description"],
+            fetch_all=tool_def.get("fetch_all", False),
         ))
         print(f"[Generator] Done: {tool_def['name']}")
 
