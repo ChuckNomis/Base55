@@ -1,14 +1,22 @@
 """
-Auto-generated MCP server by Base55.
+Auto-generated Shopify MCP server by Base55.
 Run:  pip install -r requirements.txt && python server.py
+
+Credentials are hardcoded below — to use a different store, regenerate
+via the Base55 wizard or edit SHOPIFY_STORE_DOMAIN / SHOPIFY_STOREFRONT_TOKEN.
 """
 import json
 import httpx
 from fastmcp import FastMCP
-from fastmcp.apps import AppConfig
+from fastmcp.apps import AppConfig, ResourceCSP
 
-mcp = FastMCP("Generated Commerce MCP", version="1.0.0")
-BASE_URL = "http://127.0.0.1:8001"
+mcp = FastMCP("Shopify Products MCP", version="1.0.0")
+
+# ── Shopify Config (hardcoded by Base55 wizard) ──────────────────────────────
+SHOPIFY_STORE_DOMAIN = "mcp-lab-store.myshopify.com"
+SHOPIFY_STOREFRONT_TOKEN = "730cd5bd9c3beccd064e0fff4c030d79"
+SHOPIFY_API_VERSION = "2025-01"
+SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/api/{SHOPIFY_API_VERSION}/graphql.json"
 
 # Read carousel HTML at startup (relative to this script's directory so it works
 # regardless of which directory Claude launches "python server.py" from)
@@ -17,110 +25,180 @@ _HERE = _os.path.dirname(_os.path.abspath(__file__))
 with open(_os.path.join(_HERE, "carousel.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
-# ── Generated tool functions ─────────────────────────────────────────────────
+PRODUCTS_QUERY = """
+  query SearchProducts($query: String!, $first: Int!) {
+    products(first: $first, query: $query) {
+      edges {
+        node {
+          id
+          title
+          description
+          onlineStoreUrl
+          images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+"""
 
+ALL_PRODUCTS_QUERY = """
+  query GetAllProducts($first: Int!, $after: String) {
+    products(first: $first, after: $after) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      edges {
+        node {
+          id
+          title
+          description
+          onlineStoreUrl
+          images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
+          priceRange {
+            minVariantPrice {
+              amount
+              currencyCode
+            }
+          }
+        }
+      }
+    }
+  }
+"""
 
-# Tool: get_all_products
 async def get_all_products() -> dict:
-    """
-    Fetch all products from the catalog and return them in a format
-    suitable for a carousel display. This function handles pagination
-    to ensure all products are retrieved across all available pages.
-    """
-    base_url = "http://127.0.0.1:8001"
-    endpoint = "/v1/products"
-    page = 1
-    page_size = 20
+    """Fetch every product from the Shopify store using cursor-based pagination."""
     all_products = []
-
+    cursor = None
     async with httpx.AsyncClient() as client:
         while True:
-            response = await client.get(
-                f"{base_url}{endpoint}",
-                params={"page": page, "page_size": page_size}
+            variables = {"first": 250}
+            if cursor:
+                variables["after"] = cursor
+            resp = await client.post(
+                SHOPIFY_GRAPHQL_URL,
+                json={"query": ALL_PRODUCTS_QUERY, "variables": variables},
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_TOKEN,
+                },
+                timeout=15,
             )
-            response.raise_for_status()
-
-            data = response.json()
-            items = data.get("items", [])
-
-            for item in items:
-                product = {
-                    "id": item.get("id", ""),
-                    "title": item.get("title", ""),
-                    "price": f"${item.get('price', 0):.2f}",
-                    "image_url": item.get("image_url", ""),
-                    "description": item.get("description", ""),
-                    "link": item.get("link", "")
-                }
-                all_products.append(product)
-
-            if not data.get("has_next", False):
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("errors"):
+                raise RuntimeError(f"Shopify GraphQL error: {data['errors'][0].get('message', 'unknown')}")
+            products_data = data.get("data", {}).get("products", {})
+            for edge in products_data.get("edges", []):
+                node = edge["node"]
+                price = node.get("priceRange", {}).get("minVariantPrice") or {}
+                amount = price.get("amount")
+                currency = price.get("currencyCode", "")
+                formatted_price = f"{currency} {float(amount):.2f}" if amount else ""
+                img_edges = node.get("images", {}).get("edges") or []
+                image_url = img_edges[0]["node"]["url"] if img_edges else ""
+                all_products.append({
+                    "id": node.get("id", ""),
+                    "title": node.get("title", "") or "",
+                    "price": formatted_price,
+                    "image_url": image_url,
+                    "description": node.get("description", "") or "",
+                    "link": node.get("onlineStoreUrl") or "#",
+                })
+            page_info = products_data.get("pageInfo", {})
+            if not page_info.get("hasNextPage"):
                 break
-
-            page += 1
-
+            cursor = page_info.get("endCursor")
     return {"products": all_products}
 
 
-# Tool: search_products
 async def search_products(query: str) -> dict:
-    """
-    Search for products using a query string and return them in a carousel-compatible format.
-    """
-    import httpx
-
-    base_url = "http://127.0.0.1:8001"
+    """Query the Shopify Storefront API and shape products for the carousel."""
     async with httpx.AsyncClient() as client:
-        response = await client.get(f"{base_url}/v1/products/search", params={"query": query})
-        response.raise_for_status()
-        products_data = response.json()
-
-    products = [
-        {
-            "id": product.get("id", ""),
-            "title": product.get("title", ""),
-            "price": f"${product.get('price', 0):.2f}",
-            "image_url": product.get("image_url", ""),
-            "description": product.get("description", ""),
-            "link": product.get("link", "")
-        }
-        for product in products_data
-    ]
-
+        resp = await client.post(
+            SHOPIFY_GRAPHQL_URL,
+            json={"query": PRODUCTS_QUERY, "variables": {"query": query or "", "first": 12}},
+            headers={
+                "Content-Type": "application/json",
+                "X-Shopify-Storefront-Access-Token": SHOPIFY_STOREFRONT_TOKEN,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    if data.get("errors"):
+        raise RuntimeError(f"Shopify GraphQL error: {data['errors'][0].get('message', 'unknown')}")
+    edges = data.get("data", {}).get("products", {}).get("edges", [])
+    products = []
+    for edge in edges:
+        node = edge["node"]
+        price = node.get("priceRange", {}).get("minVariantPrice") or {}
+        amount = price.get("amount")
+        currency = price.get("currencyCode", "")
+        formatted_price = f"{currency} {float(amount):.2f}" if amount else ""
+        img_edges = node.get("images", {}).get("edges") or []
+        image_url = img_edges[0]["node"]["url"] if img_edges else ""
+        products.append({
+            "id": node.get("id", ""),
+            "title": node.get("title", "") or "",
+            "price": formatted_price,
+            "image_url": image_url,
+            "description": node.get("description", "") or "",
+            "link": node.get("onlineStoreUrl") or "#",
+        })
     return {"products": products}
 
 
 # ── UI Resource ───────────────────────────────────────────────────────────────
 
 @mcp.resource(
-    "ui://products/carousel",
+    "ui://shopify/products/carousel",
     mime_type="text/html;profile=mcp-app",
     meta={"preferred-frame-size": ["100%", "320px"]},
+    app=AppConfig(
+        csp=ResourceCSP(
+            connect_domains=[f"https://{SHOPIFY_STORE_DOMAIN}"],
+            resource_domains=["https://cdn.shopify.com", "https://*.shopifycdn.com"],
+        )
+    ),
 )
 def carousel_ui() -> str:
     return _CAROUSEL_HTML
 
 # ── Tool Registrations ────────────────────────────────────────────────────────
 
-
-@mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
-
-async def get_all_products_tool() -> str:
-    """Show ALL products in a visual carousel. Use this ONLY when the user wants to browse everything with no specific filter (e.g. 'show me all products', 'what do you have?'). If the user mentions ANY specific product type, name, or category, use search_products_tool instead."""
+@mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
+async def shopify_get_all_products() -> str:
+    """Show ALL products in a visual carousel. Use this ONLY when the user wants to browse everything with no specific filter (e.g. 'show me all products', 'what do you have?'). If the user mentions ANY specific product type, name, or category, use shopify_search_products instead."""
     result = await get_all_products()
-
     return json.dumps(result)
 
-
-@mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
-
-async def search_products_tool(query: str) -> str:
-    """Search for products by keyword and display results in a visual carousel. Use this whenever the user mentions ANY specific product, type, or category (e.g. 'phone', 'shoes', 'blue jacket', 'something for running'). Always prefer this over get_all_products_tool when any search term is present."""
+@mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
+async def shopify_search_products(query: str) -> str:
+    """Search for products by keyword and display results in a visual carousel. Use this whenever the user mentions ANY specific product, type, or category (e.g. 'phone', 'shoes', 'blue jacket', 'something for running'). Always prefer this over shopify_get_all_products when any search term is present."""
     result = await search_products(query)
-
     return json.dumps(result)
-
 
 # ── Server Start ──────────────────────────────────────────────────────────────
 

@@ -4,11 +4,13 @@ Run:  pip install -r requirements.txt && python server.py
 """
 import json
 import httpx
+from urllib.parse import urlparse as _urlparse
 from fastmcp import FastMCP
-from fastmcp.apps import AppConfig
+from fastmcp.apps import AppConfig, ResourceCSP
 
 mcp = FastMCP("Generated Commerce MCP", version="1.0.0")
 BASE_URL = "{{ base_url }}"
+_BASE_ORIGIN = f"{_urlparse(BASE_URL).scheme}://{_urlparse(BASE_URL).netloc}"
 
 # Read carousel HTML at startup (relative to this script's directory so it works
 # regardless of which directory Claude launches "python server.py" from)
@@ -30,6 +32,12 @@ with open(_os.path.join(_HERE, "{{ template_name }}.html"), "r", encoding="utf-8
     "ui://products/carousel",
     mime_type="text/html;profile=mcp-app",
     meta={"preferred-frame-size": ["100%", "320px"]},
+    app=AppConfig(
+        csp=ResourceCSP(
+            connect_domains=[_BASE_ORIGIN],
+            resource_domains=["https://*"],
+        )
+    ),
 )
 def carousel_ui() -> str:
     return _CAROUSEL_HTML

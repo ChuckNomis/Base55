@@ -8,7 +8,7 @@ via the Base55 wizard or edit SHOPIFY_STORE_DOMAIN / SHOPIFY_STOREFRONT_TOKEN.
 import json
 import httpx
 from fastmcp import FastMCP
-from fastmcp.apps import AppConfig
+from fastmcp.apps import AppConfig, ResourceCSP
 
 mcp = FastMCP("Shopify Products MCP", version="1.0.0")
 
@@ -176,6 +176,12 @@ async def search_products(query: str) -> dict:
     "ui://shopify/products/carousel",
     mime_type="text/html;profile=mcp-app",
     meta={"preferred-frame-size": ["100%", "320px"]},
+    app=AppConfig(
+        csp=ResourceCSP(
+            connect_domains=[f"https://{SHOPIFY_STORE_DOMAIN}"],
+            resource_domains=["https://cdn.shopify.com", "https://*.shopifycdn.com"],
+        )
+    ),
 )
 def carousel_ui() -> str:
     return _CAROUSEL_HTML
