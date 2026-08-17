@@ -63,7 +63,10 @@
       "Bash(netstat -ano)",
       "Bash(taskkill *)",
       "PowerShell(Stop-Process *)",
-      "Bash(dir C:\\\\Users\\\\nadav\\\\Documents\\\\GitHub\\\\Base55 *)"
+      "Bash(dir C:\\\\Users\\\\nadav\\\\Documents\\\\GitHub\\\\Base55 *)",
+      "Bash(python *)",
+      "WebFetch(domain:gofastmcp.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
