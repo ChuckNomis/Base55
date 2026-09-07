@@ -22,7 +22,7 @@ SHOPIFY_GRAPHQL_URL = f"https://{SHOPIFY_STORE_DOMAIN}/api/{SHOPIFY_API_VERSION}
 # regardless of which directory Claude launches "python server.py" from)
 import os as _os
 _HERE = _os.path.dirname(_os.path.abspath(__file__))
-with open(_os.path.join(_HERE, "carousel.html"), "r", encoding="utf-8") as _f:
+with open(_os.path.join(_HERE, "grid-dark.html"), "r", encoding="utf-8") as _f:
     _CAROUSEL_HTML = _f.read()
 
 PRODUCTS_QUERY = """
@@ -189,16 +189,14 @@ def carousel_ui() -> str:
 # ── Tool Registrations ────────────────────────────────────────────────────────
 
 @mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
-async def shopify_get_all_products() -> str:
+async def shopify_get_all_products() -> dict:
     """Show ALL products in a visual carousel. Use this ONLY when the user wants to browse everything with no specific filter (e.g. 'show me all products', 'what do you have?'). If the user mentions ANY specific product type, name, or category, use shopify_search_products instead."""
-    result = await get_all_products()
-    return json.dumps(result)
+    return await get_all_products()
 
 @mcp.tool(app=AppConfig(resource_uri="ui://shopify/products/carousel"))
-async def shopify_search_products(query: str) -> str:
+async def shopify_search_products(query: str) -> dict:
     """Search for products by keyword and display results in a visual carousel. Use this whenever the user mentions ANY specific product, type, or category (e.g. 'phone', 'shoes', 'blue jacket', 'something for running'). Always prefer this over shopify_get_all_products when any search term is present."""
-    result = await search_products(query)
-    return json.dumps(result)
+    return await search_products(query)
 
 # ── Server Start ──────────────────────────────────────────────────────────────
 

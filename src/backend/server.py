@@ -35,7 +35,7 @@ MCP_TEMPLATE_DIR = TEMPLATES_DIR / "mcp_server"
 ALLOWED_TEMPLATES = {"carousel", "carousel-light", "grid-dark"}
 
 GENERATED_REQUIREMENTS = (
-    "fastmcp>=3.2.4\n"
+    "fastmcp==3.2.4\n"
     "httpx>=0.27.0\n"
 )
 

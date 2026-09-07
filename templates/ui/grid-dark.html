@@ -144,10 +144,19 @@
 </head>
 <body>
   <div class="grid" id="grid">
-    <div class="loader"><div class="spinner"></div><span class="loader-text">Loading products…</span></div>
+    <div class="loader"><div class="spinner"></div><span class="loader-text" id="loaderText">Loading products…</span></div>
   </div>
 
   <script>
+    function setStatus(text) {
+      var el = document.getElementById('loaderText');
+      if (el) el.textContent = text;
+    }
+    window.addEventListener('error', function(e) {
+      setStatus('Script error: ' + (e.message || 'unknown'));
+    });
+    setStatus('Loading products… (script started)');
+
     function safeHref(url) {
       if (!url) return '#';
       try {
@@ -223,11 +232,18 @@
     ];
 
     setTimeout(function() {
-      if (!inMcpContext) renderProducts(sampleProducts);
+      if (!inMcpContext) {
+        setStatus('No host response after 2s — showing preview data. (Last seen: ' + lastMsgSummary + ')');
+        renderProducts(sampleProducts);
+      }
     }, 2000);
+
+    var lastMsgSummary = 'none';
 
     window.addEventListener('message', function(event) {
       var msg = event.data;
+      lastMsgSummary = (msg && (msg.method || (msg.id !== undefined ? 'response id=' + msg.id : typeof msg))) + ' from ' + event.origin;
+
       if (msg && msg.type === 'set-colors') {
         var r = document.documentElement;
         if (msg.primary) r.style.setProperty('--primary-color', msg.primary);
@@ -241,6 +257,7 @@
 
       if (msg.id === mcpInitId && msg.result !== undefined) {
         inMcpContext = true;
+        setStatus('Host initialized — waiting for product data…');
         window.parent.postMessage({
           jsonrpc: '2.0',
           method: 'ui/notifications/initialized',
@@ -249,9 +266,28 @@
         notifySizeToHost();
         return;
       }
+      if (msg.id === mcpInitId && msg.error) {
+        setStatus('Host rejected initialize: ' + JSON.stringify(msg.error));
+        return;
+      }
 
       if (msg.method === 'ui/notifications/tool-result' && msg.params) {
         var content = msg.params.content;
+        var structured = msg.params.structuredContent;
+        if (structured && Array.isArray(structured.products)) {
+          renderProducts(structured.products);
+          return;
+        }
+        if (structured && structured.result !== undefined) {
+          var unwrapped = structured.result;
+          if (typeof unwrapped === 'string') {
+            try { unwrapped = JSON.parse(unwrapped); } catch (e) { unwrapped = null; }
+          }
+          if (unwrapped && Array.isArray(unwrapped.products)) {
+            renderProducts(unwrapped.products);
+            return;
+          }
+        }
         if (Array.isArray(content)) {
           for (var i = 0; i < content.length; i++) {
             var item = content[i];
@@ -259,16 +295,21 @@
               try {
                 var data = JSON.parse(item.text);
                 if (Array.isArray(data.products)) { renderProducts(data.products); return; }
-              } catch (e) {}
+              } catch (e) {
+                setStatus('Received tool-result but could not parse it: ' + e.message);
+                return;
+              }
             }
           }
         }
+        setStatus('Received tool-result with no usable content.');
         return;
       }
 
       if (msg.products && Array.isArray(msg.products)) renderProducts(msg.products);
     });
 
+    setStatus('Sending ui/initialize to host…');
     window.parent.postMessage({
       jsonrpc: '2.0',
       id: mcpInitId,

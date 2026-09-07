@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Products</title>
+  <title>Products - Dark Grid</title>
   <style>
     :root {
-      --primary-color: #3b82f6;
+      --primary-color: #7c3aed;
       --accent-color: #4ade80;
       --bg-color: #0f0f0f;
     }
@@ -14,50 +14,40 @@
     body {
       background: var(--bg-color);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      overflow: hidden;
-      height: 380px;
-      display: flex;
-      align-items: center;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
-    .carousel {
-      display: flex;
-      gap: 16px;
-      overflow-x: auto;
-      overflow-y: hidden;
+    body::-webkit-scrollbar { width: 4px; }
+    body::-webkit-scrollbar-track { background: transparent; }
+    body::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
       padding: 20px;
       width: 100%;
-      height: 100%;
-      scrollbar-width: thin;
-      scrollbar-color: #333 transparent;
-      align-items: center;
     }
-    .carousel::-webkit-scrollbar { height: 4px; }
-    .carousel::-webkit-scrollbar-track { background: transparent; }
-    .carousel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
     .card {
-      flex: 0 0 220px;
       background: #1a1a1a;
       border: 1px solid #2a2a2a;
-      border-radius: 14px;
+      border-radius: 12px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
       transition: transform 0.2s ease, border-color 0.2s ease;
-      height: 320px;
     }
     .card:hover {
-      transform: translateY(-3px);
+      transform: translateY(-2px);
       border-color: #3a3a3a;
     }
     .card-img {
       width: 100%;
-      height: 160px;
+      aspect-ratio: 1 / 1;
       background: #222;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      flex-shrink: 0;
     }
     .card-img img {
       width: 100%;
@@ -71,20 +61,18 @@
       gap: 6px;
       color: #444;
     }
-    .card-img .placeholder svg { opacity: 0.5; }
     .card-img .placeholder span { font-size: 11px; }
     .card-body {
-      padding: 14px;
+      padding: 12px;
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      min-height: 0;
+      gap: 5px;
     }
     .card-title {
-      color: #f0f0f0;
+      color: #e0e0e0;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.3;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -93,13 +81,13 @@
     }
     .card-price {
       color: var(--accent-color);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 700;
       letter-spacing: -0.3px;
     }
     .card-desc {
-      color: #777;
-      font-size: 12px;
+      color: #666;
+      font-size: 11px;
       line-height: 1.5;
       flex: 1;
       display: -webkit-box;
@@ -111,33 +99,33 @@
       display: block;
       text-align: center;
       width: 100%;
-      padding: 9px;
+      padding: 8px;
+      margin-top: 8px;
       background: var(--primary-color);
       color: white;
       border: none;
-      border-radius: 8px;
+      border-radius: 7px;
       font-weight: 600;
       cursor: pointer;
-      font-size: 13px;
+      font-size: 12px;
       text-decoration: none;
       transition: background 0.15s ease;
-      margin-top: auto;
     }
-    .card-btn:hover { background: #2563eb; }
+    .card-btn:hover { background: #6d28d9; }
     .status {
       color: #555;
       font-size: 14px;
-      padding: 20px;
+      padding: 40px 20px;
       text-align: center;
-      width: 100%;
+      grid-column: 1 / -1;
     }
     .loader {
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 14px;
-      width: 100%;
-      padding: 20px;
+      grid-column: 1 / -1;
+      padding: 40px 20px;
     }
     .spinner {
       width: 36px;
@@ -153,13 +141,22 @@
       font-size: 13px;
     }
   </style>
-<style>:root{--primary-color:#cccf26;--accent-color:#dab916;--bg-color:#0f0f0f;}</style></head>
+<style>:root{--primary-color:#3b82f6;--accent-color:#4ade80;--bg-color:#89bb1b;}</style></head>
 <body>
-  <div class="carousel" id="carousel">
-    <div class="loader"><div class="spinner"></div><span class="loader-text">Loading products…</span></div>
+  <div class="grid" id="grid">
+    <div class="loader"><div class="spinner"></div><span class="loader-text" id="loaderText">Loading products…</span></div>
   </div>
 
   <script>
+    function setStatus(text) {
+      var el = document.getElementById('loaderText');
+      if (el) el.textContent = text;
+    }
+    window.addEventListener('error', function(e) {
+      setStatus('Script error: ' + (e.message || 'unknown'));
+    });
+    setStatus('Loading products… (script started)');
+
     function safeHref(url) {
       if (!url) return '#';
       try {
@@ -185,17 +182,17 @@
       window.parent.postMessage({
         jsonrpc: '2.0',
         method: 'ui/notifications/size-changed',
-        params: { width: document.documentElement.offsetWidth, height: document.documentElement.offsetHeight }
+        params: { width: document.documentElement.offsetWidth, height: document.documentElement.scrollHeight }
       }, target);
     }
 
     function renderProducts(products) {
-      var carousel = document.getElementById('carousel');
+      var grid = document.getElementById('grid');
       if (!products || products.length === 0) {
-        carousel.innerHTML = '<div class="status">No products found.</div>';
+        grid.innerHTML = '<div class="status">No products found.</div>';
         return;
       }
-      carousel.innerHTML = products.map(function(p) {
+      grid.innerHTML = products.map(function(p) {
         var imgHtml = p.image_url
           ? '<img src="' + p.image_url + '" alt="' + escapeAttr(p.title) + '" onerror="this.parentElement.innerHTML=\'' + placeholderSvg.replace(/'/g, "\\'").replace(/"/g, '&quot;') + '\'">'
           : placeholderSvg;
@@ -213,7 +210,7 @@
           '</div>'
         );
       }).join('');
-      notifySizeToHost();
+      requestAnimationFrame(notifySizeToHost);
     }
 
     var mcpInitId = crypto.randomUUID
@@ -229,16 +226,24 @@
       { title: 'Wireless Headphones', price: '$79.99', image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400&h=400&fit=crop', description: 'Premium sound quality with active noise cancellation.', link: '#' },
       { title: 'Leather Wallet', price: '$34.99', image_url: 'https://images.unsplash.com/photo-1627123424574-724758594913?w=400&h=400&fit=crop', description: 'Slim profile, full-grain leather, RFID blocking.', link: '#' },
       { title: 'Running Shoes', price: '$119.99', image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=400&fit=crop', description: 'Lightweight breathable mesh for daily training.', link: '#' },
-      { title: 'Water Bottle', price: '$24.99', image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop', description: 'Double-wall insulated, keeps cold 24h or hot 12h.', link: '#' }
+      { title: 'Water Bottle', price: '$24.99', image_url: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400&h=400&fit=crop', description: 'Double-wall insulated, keeps cold 24h or hot 12h.', link: '#' },
+      { title: 'Mechanical Keyboard', price: '$149.99', image_url: 'https://images.unsplash.com/photo-1601445638532-3ef6d56b3b0c?w=400&h=400&fit=crop', description: 'Tactile switches, full RGB backlight, tenkeyless.', link: '#' },
+      { title: 'Minimalist Watch', price: '$199.99', image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop', description: 'Sapphire crystal glass, Swiss movement, leather strap.', link: '#' }
     ];
 
-    // If no MCP host responds within 2s we're in the wizard/standalone — show preview
     setTimeout(function() {
-      if (!inMcpContext) renderProducts(sampleProducts);
+      if (!inMcpContext) {
+        setStatus('No host response after 2s — showing preview data. (Last seen: ' + lastMsgSummary + ')');
+        renderProducts(sampleProducts);
+      }
     }, 2000);
+
+    var lastMsgSummary = 'none';
 
     window.addEventListener('message', function(event) {
       var msg = event.data;
+      lastMsgSummary = (msg && (msg.method || (msg.id !== undefined ? 'response id=' + msg.id : typeof msg))) + ' from ' + event.origin;
+
       if (msg && msg.type === 'set-colors') {
         var r = document.documentElement;
         if (msg.primary) r.style.setProperty('--primary-color', msg.primary);
@@ -252,6 +257,7 @@
 
       if (msg.id === mcpInitId && msg.result !== undefined) {
         inMcpContext = true;
+        setStatus('Host initialized — waiting for product data…');
         window.parent.postMessage({
           jsonrpc: '2.0',
           method: 'ui/notifications/initialized',
@@ -260,9 +266,28 @@
         notifySizeToHost();
         return;
       }
+      if (msg.id === mcpInitId && msg.error) {
+        setStatus('Host rejected initialize: ' + JSON.stringify(msg.error));
+        return;
+      }
 
       if (msg.method === 'ui/notifications/tool-result' && msg.params) {
         var content = msg.params.content;
+        var structured = msg.params.structuredContent;
+        if (structured && Array.isArray(structured.products)) {
+          renderProducts(structured.products);
+          return;
+        }
+        if (structured && structured.result !== undefined) {
+          var unwrapped = structured.result;
+          if (typeof unwrapped === 'string') {
+            try { unwrapped = JSON.parse(unwrapped); } catch (e) { unwrapped = null; }
+          }
+          if (unwrapped && Array.isArray(unwrapped.products)) {
+            renderProducts(unwrapped.products);
+            return;
+          }
+        }
         if (Array.isArray(content)) {
           for (var i = 0; i < content.length; i++) {
             var item = content[i];
@@ -270,22 +295,27 @@
               try {
                 var data = JSON.parse(item.text);
                 if (Array.isArray(data.products)) { renderProducts(data.products); return; }
-              } catch (e) {}
+              } catch (e) {
+                setStatus('Received tool-result but could not parse it: ' + e.message);
+                return;
+              }
             }
           }
         }
+        setStatus('Received tool-result with no usable content.');
         return;
       }
 
       if (msg.products && Array.isArray(msg.products)) renderProducts(msg.products);
     });
 
+    setStatus('Sending ui/initialize to host…');
     window.parent.postMessage({
       jsonrpc: '2.0',
       id: mcpInitId,
       method: 'ui/initialize',
       params: {
-        appInfo: { name: 'Products Carousel', version: '1.0.0' },
+        appInfo: { name: 'Products Grid Dark', version: '1.0.0' },
         appCapabilities: {},
         protocolVersion: '2026-01-26'
       }

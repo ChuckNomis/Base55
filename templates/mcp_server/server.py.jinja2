@@ -47,15 +47,14 @@ def carousel_ui() -> str:
 {% for tool in tools %}
 @mcp.tool(app=AppConfig(resource_uri="ui://products/carousel"))
 {% if tool.fetch_all %}
-async def {{ tool.name }}_tool() -> str:
+async def {{ tool.name }}_tool() -> dict:
     """{{ tool.description }}"""
-    result = await {{ tool.name }}()
+    return await {{ tool.name }}()
 {% else %}
-async def {{ tool.name }}_tool(query: str) -> str:
+async def {{ tool.name }}_tool(query: str) -> dict:
     """{{ tool.description }}"""
-    result = await {{ tool.name }}(query)
+    return await {{ tool.name }}(query)
 {% endif %}
-    return json.dumps(result)
 
 {% endfor %}
 # ── Server Start ──────────────────────────────────────────────────────────────
